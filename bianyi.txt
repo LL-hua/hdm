@@ -1,0 +1,6 @@
+1. 把 hdm/ 整个目录拷到 Windows
+2. 在 Windows 命令行里 cd hdm
+3. dotnet build hdm.ExcelAddIn -c Release
+4. 找 .xll
+5. 建一个测试目录，把 .xll + 项目文件夹放一起
+6. Excel 加载，测试 =LL_Tips()、=LL_FillCut("lot1", 85525)

@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hdm.Core", "hdm.Core\hdm.Core.csproj", "{1D952C42-3B37-4AAB-A9CC-86371AA00BBB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hdm.Console", "hdm.Console\hdm.Console.csproj", "{73E96053-4B5B-4801-A3BD-763140C1D343}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hdm.ExcelAddIn", "hdm.ExcelAddIn\hdm.ExcelAddIn.csproj", "{5B388467-17D8-4B77-9A34-8D59726F09CF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1D952C42-3B37-4AAB-A9CC-86371AA00BBB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1D952C42-3B37-4AAB-A9CC-86371AA00BBB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1D952C42-3B37-4AAB-A9CC-86371AA00BBB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1D952C42-3B37-4AAB-A9CC-86371AA00BBB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{73E96053-4B5B-4801-A3BD-763140C1D343}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{73E96053-4B5B-4801-A3BD-763140C1D343}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{73E96053-4B5B-4801-A3BD-763140C1D343}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{73E96053-4B5B-4801-A3BD-763140C1D343}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5B388467-17D8-4B77-9A34-8D59726F09CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5B388467-17D8-4B77-9A34-8D59726F09CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5B388467-17D8-4B77-9A34-8D59726F09CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5B388467-17D8-4B77-9A34-8D59726F09CF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

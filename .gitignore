@@ -1,0 +1,9 @@
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+*.xll
+*.dll
+!hdm.ExcelAddIn/bin/**/*.xll
