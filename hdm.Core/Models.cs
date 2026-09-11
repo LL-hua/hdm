@@ -86,7 +86,7 @@ namespace hdm.Core
         public double StartStation { get; set; }
         public double EndStation { get; set; }
         public int LayerIndex { get; set; }
-        public string LayerName { get; set; }
+        public string LayerName { get; set; }="";
         public double Thickness { get; set; }
         public double InnerStepWidth { get; set; }
         public double InnerSlope { get; set; }
@@ -99,7 +99,7 @@ namespace hdm.Core
         public double StartStation { get; set; }
         public double EndStation { get; set; }
         public int LayerIndex { get; set; }
-        public string LayerName { get; set; }
+        public string LayerName { get; set; }="";
         public double Thickness { get; set; }
         public double InnerStepWidth { get; set; }
         public double InnerSlope { get; set; }
@@ -112,33 +112,35 @@ namespace hdm.Core
     // ============================================================
 
     /// <summary>单桩号计算结果（保留全部几何数据，便于后续导出 CAD）</summary>
-    public class SectionResult
-    {
-        public double Station;
-        public double CenterY;
-        public double LOuterX, LOuterY;
-        public double ROuterX, ROuterY;
-        public double LeftCrossfall, RightCrossfall;
-        public double[,] FinalDesign;
-        public double[,] FinalFinished;
-        public double[,] Ground;
-        public double[,] Cleared;
-        public double[,] LeftSubgrade;
-        public double[,] RightSubgrade;
-        public List<double[,]> LayerPolygons;
-        public List<string> LayerAreaTexts;
-        public double FillArea, CutArea, ClearArea;
-        public double MinX, MaxX, MinY;
-        public List<double[]> LeftSlopePoints;
-        public List<double[]> RightSlopePoints;
-        public double LeftToeX, LeftToeY, RightToeX, RightToeY;
-    }
+    /// <summary>单桩号计算结果（保留全部几何数据，便于后续导出 CAD）</summary>
+public class SectionResult
+{
+    public double Station;
+    public double CenterY;
+    public double LOuterX, LOuterY;
+    public double ROuterX, ROuterY;
+    public double LeftCrossfall, RightCrossfall;
+    public double[,] FinalDesign = null!;
+    public double[,] FinalFinished = null!;
+    public double[,] Ground = null!;
+    public double[,] Cleared = null!;
+    public double[,] LeftSubgrade = null!;
+    public double[,] RightSubgrade = null!;
+    public List<double[,]> LayerPolygons = null!;
+    public List<string> LayerAreaTexts = null!;
+    public double FillArea, CutArea, ClearArea;
+    public double MinX, MaxX, MinY;
+    public List<double[]> LeftSlopePoints = null!;
+    public List<double[]> RightSlopePoints = null!;
+    public double LeftToeX, LeftToeY, RightToeX, RightToeY;
+}
 
     /// <summary>计算结果的包装（成功/失败/错误信息）</summary>
-    public class ComputeResult
-    {
-        public bool Success { get; set; }
-        public SectionResult Result { get; set; }
-        public string ErrorMessage { get; set; }
-    }
+    /// <summary>计算结果的包装（成功/失败/错误信息）</summary>
+public class ComputeResult
+{
+    public bool Success { get; set; }
+    public SectionResult Result { get; set; } = null!;
+    public string ErrorMessage { get; set; } = null!;
+}
 }

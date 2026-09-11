@@ -10,15 +10,15 @@ namespace hdm.Core
     /// </summary>
     public class ProjectData
     {
-        public string ProjectName { get; private set; }
-        public string ProjectDir { get; private set; }
-        public AppConfig Config { get; private set; }
+        public string ProjectName { get; private set; } = null!;
+        public string ProjectDir { get; private set; } = null!;
+        public AppConfig Config { get; private set; } = null!;
 
-        public double[,] Pqx { get; private set; }
-        public double[,] Sqx { get; private set; }
-        public double[,] Kzb { get; private set; }
+        public double[,] Pqx { get; private set; } = null!;
+        public double[,] Sqx { get; private set; } = null!;
+        public double[,] Kzb { get; private set; } = null!;
 
-        public SectionCalculator Calculator { get; private set; }
+        public SectionCalculator Calculator { get; private set; } = null!;
 
         private ProjectData() { }
 
