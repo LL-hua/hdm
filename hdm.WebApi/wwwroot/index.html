@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>hdm 横断面计算</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    font-family: -apple-system, "Microsoft YaHei", sans-serif;
+    background: #f5f5f5;
+    color: #333;
+    font-size: 15px;
+    display: flex;
+    flex-direction: column;
+    overscroll-behavior: none;
+  }
+  header {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    background: #0078d4;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: 6px;
+    padding: 6px;
+  }
+  .input-panel {
+    flex-shrink: 0;
+    background: #fff;
+    border-radius: 8px;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 6px;
+    align-items: end;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  @media (max-width: 600px) {
+    .field label { display: none; }
+  }
+  .field { display: flex; flex-direction: column; gap: 2px; }
+  .field label { font-size: 11px; color: #666; }
+  select, input {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  button {
+    padding: 7px 14px;
+    font-size: 14px;
+    background: #0078d4;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    touch-action: manipulation;
+  }
+  button:hover { background: #0066b4; }
+  button:disabled { background: #999; cursor: wait; }
+
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 0;
+  }
+
+  .stat-row {
+    flex-shrink: 0;
+    background: #fff;
+    border-radius: 8px;
+    padding: 6px 10px;
+    display: none;
+    flex-wrap: wrap;
+    gap: 2px 14px;
+    align-items: baseline;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    font-size: 13px;
+    line-height: 1.8;
+  }
+  .stat-row.show { display: flex; }
+  .stat-row .item { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+  .stat-row .item .k { color: #666; font-size: 11px; }
+  .stat-row .item .v { font-weight: 600; }
+  .stat-row .item .v.station { color: #0078d4; }
+  .stat-row .item .v.fill { color: #2a8; }
+  .stat-row .item .v.cut { color: #d33; }
+  .stat-row .item .v.clear { color: #888; }
+
+  .chart-card {
+    flex: 1;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+  }
+  #cv {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: grab;
+  }
+  #cv:active { cursor: grabbing; }
+
+  .reset-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 11px;
+    padding: 4px 10px;
+    background: rgba(0,120,212,.85);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 10;
+    touch-action: manipulation;
+  }
+  .reset-btn:hover { background: #0066b4; }
+
+  .chart-hint {
+    position: absolute;
+    bottom: 4px;
+    right: 8px;
+    font-size: 10px;
+    color: #999;
+    pointer-events: none;
+    background: rgba(255,255,255,.85);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .error {
+    position: fixed;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #c00;
+    padding: 10px 16px;
+    background: #fee;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    display: none;
+    z-index: 100;
+    max-width: 90%;
+    font-size: 14px;
+  }
+  .error.show { display: block; }
+</style>
+</head>
+<body>
+
+<header>📐 hdm 横断面计算</header>
+
+<main>
+  <div class="input-panel">
+    <div class="field">
+      <label>项目</label>
+      <select id="projectSel"><option value="">加载中...</option></select>
+    </div>
+    <div class="field">
+      <label>桩号（米）</label>
+      <input id="stationInput" type="number" inputmode="decimal" placeholder="例如 85525" step="0.01">
+    </div>
+    <button id="queryBtn" onclick="doQuery()">查询</button>
+  </div>
+
+  <div class="content">
+    <div class="stat-row" id="resultCard"></div>
+
+    <div class="chart-card">
+      <canvas id="cv"></canvas>
+      <button id="resetBtn" class="reset-btn">⤢ 重置</button>
+      <div class="chart-hint">双指缩放 / 拖动 / 双击放大</div>
+    </div>
+  </div>
+</main>
+
+<div class="error" id="errorCard"></div>
+
+<!-- 手势控制器 -->
+<script>
+/**
+ * GestureController - 纯手势交互控制
+ */
+class GestureController {
+    constructor(element, options = {}) {
+        this.element = element;
+        this.onTransform = options.onTransform || (() => {});
+        this.minScale = options.minScale || 0.00001;
+        this.maxScale = options.maxScale || 100;
+        this.transform = { offsetX: 0, offsetY: 0, scale: 1 };
+        this._isDragging = false;
+        this._dragStartX = 0;
+        this._dragStartY = 0;
+        this._isPinched = false;
+        this._startDistance = 0;
+        this._lastScale = 1;
+        this._startTouchCenterX = 0;
+        this._startTouchCenterY = 0;
+        this._pinchStartOffsetX = 0;
+        this._pinchStartOffsetY = 0;
+        this._lastTapTime = 0;
+        this._lastTapX = 0;
+        this._lastTapY = 0;
+        this._twoFingerTapStartTime = 0;
+        this._twoFingerTapStartX = 0;
+        this._twoFingerTapStartY = 0;
+        this._twoFingerTapCandidate = false;
+        this._twoFingerActive = false;
+        this._bindEvents();
+    }
+    setTransform(offsetX, offsetY, scale) {
+        this.transform.offsetX = offsetX;
+        this.transform.offsetY = offsetY;
+        this.transform.scale = Math.min(this.maxScale, Math.max(this.minScale, scale));
+        this._emit();
+    }
+    zoom(cx, cy, factor) {
+        const oldScale = this.transform.scale;
+        let newScale = oldScale * factor;
+        newScale = Math.min(this.maxScale, Math.max(this.minScale, newScale));
+        const ratio = newScale / oldScale;
+        this.transform.offsetX = cx - (cx - this.transform.offsetX) * ratio;
+        this.transform.offsetY = cy - (cy - this.transform.offsetY) * ratio;
+        this.transform.scale = newScale;
+        this._emit();
+    }
+    destroy() {
+        const el = this.element;
+        el.removeEventListener('mousedown', this._onMouseDown);
+        window.removeEventListener('mousemove', this._onMouseMove);
+        window.removeEventListener('mouseup', this._onMouseUp);
+        el.removeEventListener('wheel', this._onWheel);
+        el.removeEventListener('touchstart', this._onTouchStart);
+        el.removeEventListener('touchmove', this._onTouchMove);
+        el.removeEventListener('touchend', this._onTouchEnd);
+    }
+    _getRect() { return this.element.getBoundingClientRect(); }
+    _emit() { this.onTransform(this.transform.offsetX, this.transform.offsetY, this.transform.scale); }
+    _bindEvents() {
+        const el = this.element;
+        this._onMouseDown = this._onMouseDown.bind(this);
+        this._onMouseMove = this._onMouseMove.bind(this);
+        this._onMouseUp = this._onMouseUp.bind(this);
+        this._onWheel = this._onWheel.bind(this);
+        this._onTouchStart = this._onTouchStart.bind(this);
+        this._onTouchMove = this._onTouchMove.bind(this);
+        this._onTouchEnd = this._onTouchEnd.bind(this);
+        el.addEventListener('mousedown', this._onMouseDown);
+        window.addEventListener('mousemove', this._onMouseMove);
+        window.addEventListener('mouseup', this._onMouseUp);
+        el.addEventListener('wheel', this._onWheel, { passive: false });
+        el.addEventListener('touchstart', this._onTouchStart, { passive: false });
+        el.addEventListener('touchmove', this._onTouchMove, { passive: false });
+        el.addEventListener('touchend', this._onTouchEnd, { passive: false });
+    }
+    _onMouseDown(e) {
+        this._isDragging = true;
+        const rect = this._getRect();
+        this._dragStartX = e.clientX - rect.left - this.transform.offsetX;
+        this._dragStartY = e.clientY - rect.top - this.transform.offsetY;
+    }
+    _onMouseMove(e) {
+        if (!this._isDragging) return;
+        const rect = this._getRect();
+        this.transform.offsetX = e.clientX - rect.left - this._dragStartX;
+        this.transform.offsetY = e.clientY - rect.top - this._dragStartY;
+        this._emit();
+    }
+    _onMouseUp() { this._isDragging = false; }
+    _onWheel(e) {
+        e.preventDefault();
+        const rect = this._getRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        const delta = e.deltaY > 0 ? -0.05 : 0.05;
+        const oldScale = this.transform.scale;
+        let newScale = oldScale * (1 + delta);
+        newScale = Math.min(this.maxScale, Math.max(this.minScale, newScale));
+        const ratio = newScale / oldScale;
+        this.transform.offsetX = cx - (cx - this.transform.offsetX) * ratio;
+        this.transform.offsetY = cy - (cy - this.transform.offsetY) * ratio;
+        this.transform.scale = newScale;
+        this._emit();
+    }
+    _onTouchStart(e) {
+        const touches = e.touches;
+        const rect = this._getRect();
+        if (touches.length === 1) {
+            this._isDragging = true;
+            this._isPinched = false;
+            const touch = touches[0];
+            const cx = touch.clientX - rect.left;
+            const cy = touch.clientY - rect.top;
+            this._dragStartX = cx - this.transform.offsetX;
+            this._dragStartY = cy - this.transform.offsetY;
+            const now = Date.now();
+            if (now - this._lastTapTime < 300 && Math.hypot(cx - this._lastTapX, cy - this._lastTapY) < 20) {
+                this.zoom(cx, cy, 1.5);
+                this._lastTapTime = 0;
+            } else {
+                this._lastTapTime = now;
+                this._lastTapX = cx;
+                this._lastTapY = cy;
+            }
+        } else if (touches.length === 2) {
+            this._isDragging = false;
+            this._isPinched = true;
+            const t1 = touches[0], t2 = touches[1];
+            this._startDistance = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            this._startTouchCenterX = (t1.clientX + t2.clientX) / 2 - rect.left;
+            this._startTouchCenterY = (t1.clientY + t2.clientY) / 2 - rect.top;
+            this._lastScale = this.transform.scale;
+            this._pinchStartOffsetX = this.transform.offsetX;
+            this._pinchStartOffsetY = this.transform.offsetY;
+            this._twoFingerTapStartTime = Date.now();
+            this._twoFingerTapStartX = this._startTouchCenterX;
+            this._twoFingerTapStartY = this._startTouchCenterY;
+            this._twoFingerTapCandidate = true;
+            this._twoFingerActive = true;
+        }
+    }
+    _onTouchMove(e) {
+        e.preventDefault();
+        const touches = e.touches;
+        const rect = this._getRect();
+        if (this._isDragging && touches.length === 1) {
+            const touch = touches[0];
+            const cx = touch.clientX - rect.left;
+            const cy = touch.clientY - rect.top;
+            this.transform.offsetX = cx - this._dragStartX;
+            this.transform.offsetY = cy - this._dragStartY;
+            this._emit();
+        } else if (this._isPinched && touches.length === 2) {
+            const t1 = touches[0], t2 = touches[1];
+            const currentDistance = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            if (this._startDistance > 0) {
+                const currentCenterX = (t1.clientX + t2.clientX) / 2 - rect.left;
+                const currentCenterY = (t1.clientY + t2.clientY) / 2 - rect.top;
+                const factor = currentDistance / this._startDistance;
+                let newScale = this._lastScale * factor;
+                newScale = Math.min(this.maxScale, Math.max(this.minScale, newScale));
+                const ratio = newScale / this._lastScale;
+                this.transform.offsetX = currentCenterX - (this._startTouchCenterX - this._pinchStartOffsetX) * ratio;
+                this.transform.offsetY = currentCenterY - (this._startTouchCenterY - this._pinchStartOffsetY) * ratio;
+                this.transform.scale = newScale;
+                this._emit();
+            }
+            if (this._twoFingerTapCandidate) {
+                const cx = (touches[0].clientX + touches[1].clientX) / 2 - rect.left;
+                const cy = (touches[0].clientY + touches[1].clientY) / 2 - rect.top;
+                if (Math.hypot(cx - this._twoFingerTapStartX, cy - this._twoFingerTapStartY) > 20) {
+                    this._twoFingerTapCandidate = false;
+                }
+            }
+        }
+    }
+    _onTouchEnd(e) {
+        const remaining = e.touches.length;
+        if (remaining === 0) {
+            if (this._twoFingerTapCandidate && (Date.now() - this._twoFingerTapStartTime < 300)) {
+                this.zoom(this._twoFingerTapStartX, this._twoFingerTapStartY, 0.7);
+            }
+            this._isDragging = false;
+            this._isPinched = false;
+            this._twoFingerTapCandidate = false;
+            this._twoFingerActive = false;
+        } else if (remaining === 1) {
+            if (this._twoFingerActive) {
+                this._twoFingerTapCandidate = false;
+                this._twoFingerActive = false;
+            }
+            this._isDragging = true;
+            this._isPinched = false;
+            const rect = this._getRect();
+            const touch = e.touches[0];
+            this._dragStartX = touch.clientX - rect.left - this.transform.offsetX;
+            this._dragStartY = touch.clientY - rect.top - this.transform.offsetY;
+        }
+    }
+}
+</script>
+
+<script>
+const api = (path) => fetch(path).then(r => r.json());
+
+// ============================================================
+// 项目列表
+// ============================================================
+async function loadProjects() {
+  try {
+    const res = await api('/api/projects');
+    const sel = document.getElementById('projectSel');
+    sel.innerHTML = '';
+    if (!res.ok || !res.projects || res.projects.length === 0) {
+      sel.innerHTML = '<option value="">（没有项目）</option>';
+      return;
+    }
+    for (const p of res.projects) {
+      const opt = document.createElement('option');
+      opt.value = p; opt.textContent = p;
+      sel.appendChild(opt);
+    }
+    sel.value = res.projects[0];
+  } catch (e) {
+    document.getElementById('projectSel').innerHTML = '<option value="">加载失败</option>';
+  }
+}
+
+// ============================================================
+// 查询
+// ============================================================
+async function doQuery() {
+  const project = document.getElementById('projectSel').value;
+  const stationStr = document.getElementById('stationInput').value;
+  const btn = document.getElementById('queryBtn');
+  const card = document.getElementById('resultCard');
+
+  hideError();
+  if (!project) { showError('请选择项目'); return; }
+  if (!stationStr) { showError('请输入桩号'); return; }
+  const station = parseFloat(stationStr);
+  if (isNaN(station)) { showError('桩号格式错误'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '...';
+  card.classList.remove('show');
+
+  try {
+    const res = await api(`/api/fillcut?project=${encodeURIComponent(project)}&station=${station}`);
+    if (!res.ok) { showError(res.error || '计算失败'); return; }
+
+    card.innerHTML = `
+      <div class="item"><span class="k">桩号</span><span class="v station">${res.stationK}</span></div>
+      <div class="item"><span class="k">填方</span><span class="v fill">${res.fill.toFixed(3)}</span></div>
+      <div class="item"><span class="k">挖方</span><span class="v cut">${res.cut.toFixed(3)}</span></div>
+      <div class="item"><span class="k">清表</span><span class="v clear">${res.clear.toFixed(3)}</span></div>
+      <div class="item"><span class="k">中桩</span><span class="v">${res.centerY.toFixed(3)}</span></div>
+    `;
+    card.classList.add('show');
+
+    if (res.geometry) {
+      currentData = res;
+      drawAndFit(res);
+    }
+  } catch (e) {
+    showError('请求失败: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '查询';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorCard');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(hideError, 3000);
+}
+function hideError() { document.getElementById('errorCard').classList.remove('show'); }
+
+// ============================================================
+// Canvas 绘制
+// ============================================================
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+let currentData = null;   // 当前断面数据
+let worldBounds = null;   // { minX, maxX, minY, maxY }
+let canvasW = 0, canvasH = 0;
+let dpr = window.devicePixelRatio || 1;
+
+// 世界坐标 → canvas 像素
+function worldToCanvas(wx, wy, transform) {
+  return [
+    wx * transform.scale + transform.offsetX,
+    -wy * transform.scale + transform.offsetY
+  ];
+}
+
+// 画折线
+function drawPolyline(pts, transform, color, width, dash) {
+  if (!pts || pts.length < 2) return;
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  if (dash) ctx.setLineDash(dash);
+  else ctx.setLineDash([]);
+  for (let i = 0; i < pts.length; i++) {
+    const [px, py] = worldToCanvas(pts[i][0], pts[i][1], transform);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// 画多边形（填充 + 描边）
+function drawPolygon(pts, transform, fill, stroke, width) {
+  if (!pts || pts.length < 3) return;
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i++) {
+    const [px, py] = worldToCanvas(pts[i][0], pts[i][1], transform);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width || 1; ctx.stroke(); }
+}
+
+// 主绘制
+function render(transform) {
+  if (!currentData) return;
+
+  ctx.clearRect(0, 0, canvasW, canvasH);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  const g = currentData.geometry;
+  const res = currentData;
+
+  // 结构层多边形（底层）
+  if (g.layerPolygons) {
+    g.layerPolygons.forEach((poly, i) => {
+      const fill = i % 2 === 0 ? '#cfe4f7' : '#e8f0f8';
+      const stroke = i % 2 === 0 ? '#4a90d9' : '#7bc0e8';
+      drawPolygon(poly, transform, fill, stroke, 1);
+    });
+  }
+
+  // 地面线（绿）
+  if (g.ground) drawPolyline(g.ground, transform, '#0a0', 2);
+
+  // 清表线（灰虚线）
+  if (g.cleared) drawPolyline(g.cleared, transform, '#888', 1, [4, 3]);
+
+  // 设计线（红）
+  if (g.finalDesign) drawPolyline(g.finalDesign, transform, '#d00', 2.5);
+
+  // 完工线（黄）
+  if (g.finalFinished) drawPolyline(g.finalFinished, transform, '#cc0', 1.5);
+
+  // ---- 中桩设计高程 ----
+  if (res.centerY !== undefined) {
+    const [px, py] = worldToCanvas(0, res.centerY, transform);
+    ctx.font = '13px sans-serif';
+    ctx.fillStyle = '#0078d4';
+    ctx.textAlign = 'center';
+    ctx.fillText(res.centerY.toFixed(3), px, py - 6);
+  }
+
+  // ---- 左上角：桩号 + 面积 ----
+  ctx.font = 'bold 14px sans-serif';
+  ctx.fillStyle = '#333';
+  ctx.textAlign = 'left';
+  ctx.fillText(res.stationK, 10, 20);
+
+  ctx.font = '12px sans-serif';
+  ctx.fillStyle = '#2a8';
+  ctx.fillText('填 ' + res.fill.toFixed(3) + ' ㎡', 10, 38);
+  ctx.fillStyle = '#d33';
+  ctx.fillText('挖 ' + res.cut.toFixed(3) + ' ㎡', 10, 54);
+  ctx.fillStyle = '#888';
+  ctx.fillText('清 ' + res.clear.toFixed(3) + ' ㎡', 10, 70);
+}
+
+// ============================================================
+// Canvas 尺寸自适应
+// ============================================================
+function resizeCanvas() {
+  const rect = cv.getBoundingClientRect();
+  canvasW = rect.width;
+  canvasH = rect.height;
+  dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(canvasW * dpr);
+  cv.height = Math.round(canvasH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  if (currentData) render(gesture.transform);
+});
+
+// ============================================================
+// 手势实例
+// ============================================================
+const gesture = new GestureController(cv, {
+  minScale: 0.01,
+  maxScale: 200,
+  onTransform: (offsetX, offsetY, scale) => {
+    render({ offsetX, offsetY, scale });
+  }
+});
+
+// ============================================================
+// 自动 fit：让断面正好铺满 canvas
+// ============================================================
+function fitToCanvas(res) {
+  const g = res.geometry;
+  const allPts = [];
+  const push = (arr) => { if (arr) for (const p of arr) allPts.push(p); };
+  push(g.ground); push(g.cleared); push(g.finalDesign); push(g.finalFinished);
+  if (g.layerPolygons) for (const poly of g.layerPolygons) push(poly);
+  if (allPts.length === 0) return;
+
+  let minX = allPts[0][0], maxX = allPts[0][0];
+  let minY = allPts[0][1], maxY = allPts[0][1];
+  for (const p of allPts) {
+    if (p[0] < minX) minX = p[0];
+    if (p[0] > maxX) maxX = p[0];
+    if (p[1] < minY) minY = p[1];
+    if (p[1] > maxY) maxY = p[1];
+  }
+  const padX = (maxX - minX) * 0.08 || 1;
+  const padY = (maxY - minY) * 0.15 || 1;
+  minX -= padX; maxX += padX;
+  minY -= padY; maxY += padY;
+
+  const worldW = maxX - minX;
+  const worldH = maxY - minY;
+
+  const scale = Math.min(canvasW / worldW, canvasH / worldH);
+
+  // 世界中心
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+
+  // 让世界中心 (cx, cy) 映射到 canvas 中心 (canvasW/2, canvasH/2)
+  // px = cx * scale + offsetX = canvasW / 2
+  // py = -cy * scale + offsetY = canvasH / 2
+  const offsetX = canvasW / 2 - cx * scale;
+  const offsetY = canvasH / 2 + cy * scale;
+
+  worldBounds = { minX, maxX, minY, maxY };
+  gesture.setTransform(offsetX, offsetY, scale);
+  render(gesture.transform);
+}
+
+function drawAndFit(res) {
+  resizeCanvas();
+  fitToCanvas(res);
+}
+
+// 重置按钮
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (currentData) fitToCanvas(currentData);
+});
+
+// ============================================================
+// 初始化
+// ============================================================
+document.getElementById('stationInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doQuery();
+});
+
+resizeCanvas();
+loadProjects();
+</script>
+</body>
+</html>

@@ -109,7 +109,7 @@ class Program
 
             Console.WriteLine();
             Console.WriteLine("=========================");
-            Console.WriteLine($" 桩号: {LL.hua_Num2K(station)}  ({station} m)");
+            Console.WriteLine($" 桩号: {LL.hua_Num2K(station)}");
             if (!r.Success)
             {
                 Console.ForegroundColor = ConsoleColor.Red;

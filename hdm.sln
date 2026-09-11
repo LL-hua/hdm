@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hdm.Console", "hdm.Console\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hdm.ExcelAddIn", "hdm.ExcelAddIn\hdm.ExcelAddIn.csproj", "{5B388467-17D8-4B77-9A34-8D59726F09CF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hdm.WebApi", "hdm.WebApi\hdm.WebApi.csproj", "{4E6E1F1E-4B52-47BF-A8F6-D9FB3A9A491E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{5B388467-17D8-4B77-9A34-8D59726F09CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5B388467-17D8-4B77-9A34-8D59726F09CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5B388467-17D8-4B77-9A34-8D59726F09CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E6E1F1E-4B52-47BF-A8F6-D9FB3A9A491E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E6E1F1E-4B52-47BF-A8F6-D9FB3A9A491E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E6E1F1E-4B52-47BF-A8F6-D9FB3A9A491E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E6E1F1E-4B52-47BF-A8F6-D9FB3A9A491E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

@@ -1,0 +1,164 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using hdm.Core;
+
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
+
+string RootDir = Directory.GetCurrentDirectory();
+
+// ---------- 项目缓存 ----------
+var cache = new Dictionary<string, ProjectData>(StringComparer.OrdinalIgnoreCase);
+var lockObj = new object();
+
+ProjectData GetProject(string projectName)
+{
+    if (string.IsNullOrWhiteSpace(projectName))
+        throw new ArgumentException("项目名称不能为空");
+
+    lock (lockObj)
+    {
+        if (cache.TryGetValue(projectName, out var d))
+            return d;
+
+        string projectDir = Path.Combine(RootDir, projectName);
+        if (!Directory.Exists(projectDir))
+            throw new DirectoryNotFoundException($"项目文件夹不存在：{projectDir}");
+
+        d = ProjectData.Load(projectName, projectDir);
+        cache[projectName] = d;
+        return d;
+    }
+}
+
+List<string> ListProjects()
+{
+    var exclude = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "bin", "obj", "wwwroot", "result", "Properties",
+        ".git", ".idea", "vendor", "packages", "node_modules"
+    };
+
+    return Directory.GetDirectories(RootDir)
+        .Select(Path.GetFileName)
+        .Where(f => !string.IsNullOrEmpty(f)
+                    && !f.StartsWith(".")
+                    && !exclude.Contains(f))
+        .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+}
+
+// ---------- double[,] -> double[][] ----------
+static double[][] ToJagged(double[,] mat)
+{
+    if (mat == null) return Array.Empty<double[]>();
+    int rows = mat.GetLength(0);
+    int cols = mat.GetLength(1);
+    var arr = new double[rows][];
+    for (int i = 0; i < rows; i++)
+    {
+        arr[i] = new double[cols];
+        for (int j = 0; j < cols; j++)
+            arr[i][j] = mat[i, j];
+    }
+    return arr;
+}
+
+// ---------- 静态文件 ----------
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
+// ---------- API ----------
+app.MapGet("/api/projects", () =>
+{
+    try { return Results.Ok(new { ok = true, projects = ListProjects() }); }
+    catch (Exception ex) { return Results.Ok(new { ok = false, error = ex.Message }); }
+});
+
+app.MapGet("/api/fillcut", (string project, double station) =>
+{
+    try
+    {
+        var data = GetProject(project);
+        var r = data.Query(station);
+        if (!r.Success)
+            return Results.Ok(new { ok = false, error = r.ErrorMessage });
+
+        var s = r.Result;
+
+        var layerPolys = new List<double[][]>();
+        if (s.LayerPolygons != null)
+            foreach (var poly in s.LayerPolygons)
+                layerPolys.Add(ToJagged(poly));
+
+        // 返回 SectionResult 的全部字段
+        return Results.Ok(new
+        {
+            ok = true,
+            project,
+            station,
+            stationK = LL.hua_Num2K(station),
+
+            // ---- 位置 ----
+            centerY = s.CenterY,
+
+            // ---- 路基外缘 ----
+            lOuterX = s.LOuterX, lOuterY = s.LOuterY,
+            rOuterX = s.ROuterX, rOuterY = s.ROuterY,
+            leftCrossfall = s.LeftCrossfall,
+            rightCrossfall = s.RightCrossfall,
+
+            // ---- 面积 ----
+            fill = s.FillArea,
+            cut = s.CutArea,
+            clear = s.ClearArea,
+            layers = s.LayerAreaTexts,
+
+            // ---- 范围 ----
+            minX = s.MinX, maxX = s.MaxX, minY = s.MinY,
+
+            // ---- 边坡 ----
+            leftSlopePoints = s.LeftSlopePoints,
+            rightSlopePoints = s.RightSlopePoints,
+            leftToeX = s.LeftToeX, leftToeY = s.LeftToeY,
+            rightToeX = s.RightToeX, rightToeY = s.RightToeY,
+
+            // ---- 几何折线 ----
+            geometry = new
+            {
+                ground        = ToJagged(s.Ground),
+                cleared       = ToJagged(s.Cleared),
+                finalDesign   = ToJagged(s.FinalDesign),
+                finalFinished = ToJagged(s.FinalFinished),
+                leftSubgrade  = ToJagged(s.LeftSubgrade),
+                rightSubgrade = ToJagged(s.RightSubgrade),
+                layerPolygons = layerPolys
+            }
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { ok = false, error = ex.Message });
+    }
+});
+
+app.MapGet("/api/stations", (string project) =>
+{
+    try
+    {
+        var data = GetProject(project);
+        var list = data.Stations.Select(s => new { value = s, label = LL.hua_Num2K(s) }).ToList();
+        return Results.Ok(new { ok = true, stations = list });
+    }
+    catch (Exception ex) { return Results.Ok(new { ok = false, error = ex.Message }); }
+});
+
+app.MapGet("/api/refresh", (string project) =>
+{
+    lock (lockObj) { cache.Remove(project); }
+    return Results.Ok(new { ok = true, message = $"已清空项目 {project} 的缓存" });
+});
+
+app.Run("http://0.0.0.0:5000");

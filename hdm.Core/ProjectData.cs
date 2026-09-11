@@ -40,13 +40,13 @@ namespace hdm.Core
 
             // ---------- 路径拼接 ----------
             string xyzPath = Path.Combine(projectDir, projectName + ".原地面");
-            string lt = Path.Combine(projectDir, projectName + ".左板块");
-            string rt = Path.Combine(projectDir, projectName + ".右板块");
+            string 左板块 = Path.Combine(projectDir, projectName + ".左板块");
+            string 右板块 = Path.Combine(projectDir, projectName + ".右板块");
             string bp = Path.Combine(projectDir, projectName + ".边坡");
-            string l_st = Path.Combine(projectDir, projectName + ".左结构层");
-            string r_st = Path.Combine(projectDir, projectName + ".右结构层");
-            string l_cf = Path.Combine(projectDir, projectName + ".左结构层横坡");
-            string r_cf = Path.Combine(projectDir, projectName + ".右结构层横坡");
+            string 左结构层 = Path.Combine(projectDir, projectName + ".左结构层");
+            string 右结构层 = Path.Combine(projectDir, projectName + ".右结构层");
+            string 左结构层横坡 = Path.Combine(projectDir, projectName + ".左结构层横坡");
+            string 右结构层横坡 = Path.Combine(projectDir, projectName + ".右结构层横坡");
             string pqxPath = Path.Combine(projectDir, projectName + ".pqx");
             string sqxPath = Path.Combine(projectDir, projectName + ".sqx");
             string kzbPath = Path.Combine(projectDir, projectName + ".k");
@@ -59,13 +59,13 @@ namespace hdm.Core
 
             double[][] mesh = LL.hua_Fs_Batch(pqx, xyz1);
 
-            var leftWidths = LuJiYaoSuYinQing.ParseFile(lt);
-            var rightWidths = LuJiYaoSuYinQing.ParseFile(rt);
+            var leftWidths = LuJiYaoSuYinQing.ParseFile(左板块);
+            var rightWidths = LuJiYaoSuYinQing.ParseFile(右板块);
             var slopeData = BianPoYinQing.ParseFile(bp);
-            var leftCrossfalls = LumianSlopeManager.ParseFile(l_cf);
-            var rightCrossfalls = LumianSlopeManager.ParseFile(r_cf);
-            var leftStructures = LeftJiegoucengManager.ParseFile(l_st);
-            var rightStructures = RightJiegoucengManager.ParseFile(r_st);
+            var leftCrossfalls = LumianSlopeManager.ParseFile(左结构层横坡);
+            var rightCrossfalls = LumianSlopeManager.ParseFile(右结构层横坡);
+            var leftStructures = LeftJiegoucengManager.ParseFile(左结构层);
+            var rightStructures = RightJiegoucengManager.ParseFile(右结构层);
 
             data.Pqx = pqx;
             data.Sqx = sqx;

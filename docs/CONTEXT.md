@@ -245,3 +245,24 @@ dotnet build hdm.ExcelAddIn -c Release
 ---
 
 *最后更新：项目重构完成，Excel 加载项跑通。*
+
+
+## hdm.WebApi
+
+- **技术**：ASP.NET Core Minimal API + 原生 HTML/Canvas
+- **端口**：5000
+- **项目根目录**：`hdm.WebApi/`（`dotnet run` 所在目录）
+- **接口**：
+  - `GET /api/projects` — 列项目
+  - `GET /api/fillcut?project=X&station=Y` — 查断面（含全部几何数据）
+  - `GET /api/stations?project=X` — 列桩号
+  - `GET /api/refresh?project=X` — 清缓存
+- **前端**：`wwwroot/index.html`，单页
+  - Canvas 画断面
+  - `GestureController` 手势（拖拽、双指缩放、双击放大、双指点击缩小）
+  - 坐标映射：`px = wx * scale + offsetX`，`py = -wy * scale + offsetY`
+- **部署**：手机 Termux 里 `dotnet run`，局域网访问 `http://手机IP:5000`
+
+### 已完成
+- [x] hdm.WebApi + 网页版跑通
+- [x] Canvas 手势（用 GestureController）

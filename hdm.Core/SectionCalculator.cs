@@ -9,15 +9,24 @@ namespace hdm.Core
     /// </summary>
     public class SectionCalculator
     {
-        private readonly double[][] _mesh;
-        private readonly double[,] _pqx;
-        private readonly double[,] _sqx;
-        private readonly List<DuanMianShuJu> _leftWidths;
-        private readonly List<DuanMianShuJu> _rightWidths;
-        private readonly List<BianPoDuanLuo> _slopeData;
-        private readonly List<CrossfallRecord> _leftCrossfalls;
-        private readonly List<CrossfallRecord> _rightCrossfalls;
-        private readonly List<LeftJiegoucengConfig> _leftStructures;
+    /**
+            var leftWidths = LuJiYaoSuYinQing.ParseFile(左板块);
+            var rightWidths = LuJiYaoSuYinQing.ParseFile(右板块);
+            var slopeData = BianPoYinQing.ParseFile(bp);
+            var leftCrossfalls = LumianSlopeManager.ParseFile(左结构层横坡);
+            var rightCrossfalls = LumianSlopeManager.ParseFile(右结构层横坡);
+            var leftStructures = LeftJiegoucengManager.ParseFile(左结构层);
+            var rightStructures = RightJiegoucengManager.ParseFile(右结构层);
+**/
+        private readonly double[][] _mesh;//断面记录
+        private readonly double[,] _pqx;//设计平曲线
+        private readonly double[,] _sqx;//设计数曲线
+        private readonly List<DuanMianShuJu> _leftWidths;//设计左幅顶面各板块 ∆x,∆y....
+        private readonly List<DuanMianShuJu> _rightWidths;//设计右顶面各板块 ∆x,∆y....
+        private readonly List<BianPoDuanLuo> _slopeData;//边坡
+        private readonly List<CrossfallRecord> _leftCrossfalls;//左侧结构层横坡
+        private readonly List<CrossfallRecord> _rightCrossfalls;//右结构层横坡
+        private readonly List<LeftJiegoucengConfig> _leftStructures;//结构层
         private readonly List<RightJiegoucengConfig> _rightStructures;
         private readonly double _clearDepth;
 
