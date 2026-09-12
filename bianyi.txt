@@ -4,3 +4,17 @@
 4. 找 .xll
 5. 建一个测试目录，把 .xll + 项目文件夹放一起
 6. Excel 加载，测试 =LL_Tips()、=LL_FillCut("lot1", 85525)
+
+
+cd ~/hdm/hdm.WebApi
+dotnet run
+
+http://localhost:5000
+
+
+
+
+cd ~/hdm
+git add .
+git commit -m "Web 前端：Canvas 添加顶面/边坡/横坡标注，文字跟随缩放"
+git push

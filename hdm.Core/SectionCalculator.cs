@@ -53,8 +53,7 @@ namespace hdm.Core
 
             var dao = LuJiYaoSuYinQing.getcrosectonxy(station, centerY, _leftWidths, _rightWidths);
 
-            // 左侧 / 右侧点（从左到右）
-            var zuoDian = dao.ZuoCeCheDaoJueDui;   // N×2
+            var zuoDian = dao.ZuoCeCheDaoJueDui;   // N×2，从左到右
             var youDian = dao.YouCeCheDaoJueDui;
 
             if (zuoDian == null || zuoDian.GetLength(0) == 0 ||
@@ -80,6 +79,7 @@ namespace hdm.Core
             if (bpCfg == null)
                 return new ComputeResult { Success = false, ErrorMessage = "边坡段落为空" };
 
+            // 边坡候选（4 组绝对坐标）
             var candidates = BianPoYinQing.getAbsolute(bpCfg, lOuterX, lOuterY, rOuterX, rOuterY);
             double lGroundY = LL.FromXgetY(ground, lOuterX);
             var finalLeft = (lOuterY > lGroundY) ? candidates.ZuoTianJueDui : candidates.ZuoWaJueDui;
@@ -116,7 +116,6 @@ namespace hdm.Core
             if (leftPolygons.Count == 0)
                 return new ComputeResult { Success = false, ErrorMessage = "左幅结构层段落为空" };
 
-            // 用左结构层最内侧点反查设计线高 → 修正 centerY
             double leftInnerX = leftSubgrade[leftSubgrade.GetLength(0) - 1, 0];
             double newH = LL.FromXgetY(designTop, leftInnerX);
             leftCenter = new double[] { 0.0, newH };
@@ -139,40 +138,30 @@ namespace hdm.Core
             rightPolygons = RightJiegoucengManager.ComputeCoordinates(
                 station, rightCenter, rightCrossfall, _rightStructures, out rightSubgrade);
 
-            // ---------- 拼最终设计线 + 完工线 ----------
+            // ---------- 拼最终设计线 ----------
             double leftOuterAnchor = leftSubgrade.GetLength(0) > 0 ? leftSubgrade[0, 0] : lOuterX;
             double rightOuterAnchor = rightSubgrade.GetLength(0) > 0
                 ? rightSubgrade[rightSubgrade.GetLength(0) - 1, 0] : rOuterX;
 
             var designList = new List<double[]>();
-            var finishedList = new List<double[]>();
 
-            AddOuterPart(rawDesign, designList, finishedList, leftOuterAnchor, -1);
+            AddOuterPart(rawDesign, designList, leftOuterAnchor, -1);
 
             if (leftSubgrade != null)
                 for (int i = 0; i < leftSubgrade.GetLength(0); i++)
                     designList.Add(new[] { leftSubgrade[i, 0], leftSubgrade[i, 1] });
 
-            for (int i = 0; i < zuoDian.GetLength(0); i++)
-                finishedList.Add(new[] { zuoDian[i, 0], zuoDian[i, 1] });
-
             double leftInnerAnchor = leftSubgrade[leftSubgrade.GetLength(0) - 1, 0];
             double rightInnerAnchor = rightSubgrade[0, 0];
             foreach (var p in rawDesign)
                 if (p[0] >= leftInnerAnchor && p[0] <= rightInnerAnchor)
-                {
                     designList.Add(p);
-                    finishedList.Add(p);
-                }
 
             if (rightSubgrade != null)
                 for (int i = 0; i < rightSubgrade.GetLength(0); i++)
                     designList.Add(new[] { rightSubgrade[i, 0], rightSubgrade[i, 1] });
 
-            for (int i = 0; i < youDian.GetLength(0); i++)
-                finishedList.Add(new[] { youDian[i, 0], youDian[i, 1] });
-
-            AddOuterPart(rawDesign, designList, finishedList, rightOuterAnchor, 1);
+            AddOuterPart(rawDesign, designList, rightOuterAnchor, 1);
 
             double[,] designMat = ToMat(designList);
 
@@ -195,18 +184,10 @@ namespace hdm.Core
                 finalDesign[i, 1] = res[idx++];
             }
 
-            double minTrim = finalDesign[0, 0];
-            double maxTrim = finalDesign[finalDesign.GetLength(0) - 1, 0];
-            var trimmedFinished = new List<double[]>();
-            foreach (var p in finishedList)
-                if (p[0] >= minTrim && p[0] <= maxTrim) trimmedFinished.Add(p);
-            double[,] finalFinished = ToMat(trimmedFinished);
-
-            // ---------- 结构层面积 + 多边形 ----------
+            // ---------- 结构层面积 ----------
             var layerAreaTexts = new List<string>();
             var layerPolygons = new List<double[,]>();
 
-            // 清表线裁剪（保留 [minX, maxX] 内）
             var temp = new List<double[]>();
             for (int i = 0; i < cleared.GetLength(0); i++)
             {
@@ -248,23 +229,38 @@ namespace hdm.Core
                     layerPolygons.Add(poly);
                 }
 
-            // ---------- 边坡裁剪（从 finalDesign 切）----------
-            var leftTrimmed = new List<double[]>();
-            for (int i = 0; i < finalDesign.GetLength(0); i++)
-            {
-                if (finalDesign[i, 0] <= leftOuterAnchor)
-                    leftTrimmed.Add(new[] { finalDesign[i, 0], finalDesign[i, 1] });
-                else break;
-            }
+            // ---------- 边坡裁剪 ----------
+            // 坡脚 = 设计线与地面线的交点（finalDesign 两端）
+            double lToeX = finalDesign[0, 0];
+            double lToeY = finalDesign[0, 1];
+            double rToeX = finalDesign[finalDesign.GetLength(0) - 1, 0];
+            double rToeY = finalDesign[finalDesign.GetLength(0) - 1, 1];
 
-            var rightTrimmed = new List<double[]>();
-            for (int i = finalDesign.GetLength(0) - 1; i >= 0; i--)
+            // 左边坡裁剪：从左到右（坡脚 → ... → 路基外缘）
+            var leftTrimmed = new List<double[]>();
+            leftTrimmed.Add(new[] { lToeX, lToeY });
+            if (finalLeft != null)
             {
-                if (finalDesign[i, 0] >= rightOuterAnchor)
-                    rightTrimmed.Add(new[] { finalDesign[i, 0], finalDesign[i, 1] });
-                else break;
+                for (int i = 0; i < finalLeft.GetLength(0); i++)
+                {
+                    if (finalLeft[i, 0] >= lToeX)
+                        leftTrimmed.Add(new[] { finalLeft[i, 0], finalLeft[i, 1] });
+                }
             }
-            rightTrimmed.Reverse();
+            leftTrimmed.Add(new[] { lOuterX, lOuterY });
+
+            // 右边坡裁剪：从左到右（路基外缘 → ... → 坡脚）
+            var rightTrimmed = new List<double[]>();
+            rightTrimmed.Add(new[] { rOuterX, rOuterY });
+            if (finalRight != null)
+            {
+                for (int i = 0; i < finalRight.GetLength(0); i++)
+                {
+                    if (finalRight[i, 0] <= rToeX)
+                        rightTrimmed.Add(new[] { finalRight[i, 0], finalRight[i, 1] });
+                }
+            }
+            rightTrimmed.Add(new[] { rToeX, rToeY });
 
             // ---------- 组装结果 ----------
             return new ComputeResult
@@ -277,13 +273,12 @@ namespace hdm.Core
 
                     LOuter = new[] { lOuterX, lOuterY },
                     ROuter = new[] { rOuterX, rOuterY },
-                    LToe = new[] { finalDesign[0, 0], finalDesign[0, 1] },
-                    RToe = new[] { finalDesign[finalDesign.GetLength(0) - 1, 0], finalDesign[finalDesign.GetLength(0) - 1, 1] },
+                    LToe = new[] { lToeX, lToeY },
+                    RToe = new[] { rToeX, rToeY },
 
                     Ground = ground,
                     Cleared = cleared1,
                     Design = finalDesign,
-                    Finished = finalFinished,
                     LeftSubgrade = leftSubgrade,
                     RightSubgrade = rightSubgrade,
                     Layers = layerPolygons,
@@ -318,14 +313,14 @@ namespace hdm.Core
         }
 
         private static void AddOuterPart(
-            List<double[]> raw, List<double[]> design, List<double[]> finished,
+            List<double[]> raw, List<double[]> design,
             double anchor, int side)
         {
             for (int i = 0; i < raw.Count; i++)
             {
                 var p = raw[i];
                 bool condition = side < 0 ? p[0] <= anchor : p[0] >= anchor;
-                if (condition) { design.Add(p); finished.Add(p); }
+                if (condition) design.Add(p);
 
                 if (i > 0)
                 {
@@ -335,8 +330,7 @@ namespace hdm.Core
                     {
                         double x1 = prev[0], y1 = prev[1], x2 = p[0], y2 = p[1];
                         double y = y1 + (y2 - y1) * (anchor - x1) / (x2 - x1);
-                        var pt = new double[] { anchor, y };
-                        design.Add(pt); finished.Add(pt);
+                        design.Add(new double[] { anchor, y });
                     }
                 }
             }

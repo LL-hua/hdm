@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using hdm.Core;
-
+using System.Linq;
 class Program
 {
     static void Main(string[] args)
@@ -119,14 +119,35 @@ class Program
             else
             {
                 var s = r.Result;
-                Console.WriteLine($" 填方面积: {s.FillArea:F3} ㎡");
-                Console.WriteLine($" 挖方面积: {s.CutArea:F3} ㎡");
-                Console.WriteLine($" 清表面积: {s.ClearArea:F3} ㎡");
-                Console.WriteLine($" 清表范围: X = [{s.Bounds[0]:F3}, {s.Bounds[2]:F3}]");
-                Console.WriteLine($" 中桩高程: {s.CenterY:F3}");
-                Console.WriteLine(" 结构层面积:");
-                foreach (var txt in s.LayerAreas)
-                    Console.WriteLine($"   {txt}");
+/**
+        // ---- 关键点（单个点用 double[]）----
+        public double[] LOuter;      // 左路基外缘 [x, y]
+        public double[] ROuter;      // 右路基外缘 [x, y]
+        public double[] LToe;        // 左坡脚 [x, y]
+        public double[] RToe;        // 右坡脚 [x, y]
+        // ---- 折线 ----
+        public double[,] Ground;         // 地面线
+        public double[,] Cleared;        // 清表线
+        public double[,] Design;         // 设计线（裁剪后）
+        public double[,] Finished;       // 完工线
+        public double[,] LeftSubgrade;   // 左路基线
+        public double[,] RightSubgrade;  // 右路基线
+        public List<double[,]> Layers;   // 结构层多边形
+        // ---- 顶面板块（与车道点一一对应）----
+        public double[,] LeftSlabs;      // N×2：[宽度, 横坡%]
+        public double[,] RightSlabs;
+        // ---- 边坡 ----
+        public double[,] LeftSlopeRaw;       // 左边坡（裁剪前，完整）
+        public double[,] LeftSlopeTrimmed;   // 左边坡（裁剪后）
+        public double[,] RightSlopeRaw;      // 右边坡（裁剪前，完整）
+        public double[,] RightSlopeTrimmed;  // 右边坡（裁剪后）
+        // ---- 面积 ----
+        public double FillArea, CutArea, ClearArea;
+        public List<string> LayerAreas;      // 结构层面积文本
+        // ---- 包围盒 ----
+        public double[] Bounds;        
+**/         
+              Console.WriteLine(s);  
             }
             Console.WriteLine($" 耗时: {t.Elapsed.TotalMilliseconds:F2} ms");
             Console.WriteLine("=========================");

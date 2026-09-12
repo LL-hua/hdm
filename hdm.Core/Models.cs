@@ -104,7 +104,6 @@ namespace hdm.Core
         public double[,] Ground;         // 地面线
         public double[,] Cleared;        // 清表线
         public double[,] Design;         // 设计线（裁剪后）
-        public double[,] Finished;       // 完工线
         public double[,] LeftSubgrade;   // 左路基线
         public double[,] RightSubgrade;  // 右路基线
         public List<double[,]> Layers;   // 结构层多边形
@@ -125,6 +124,106 @@ namespace hdm.Core
 
         // ---- 包围盒 ----
         public double[] Bounds;              // [MinX, MinY, MaxX, MaxY]
+
+        // ========================================================
+        //                     ToString 重写
+        // ========================================================
+        public override string ToString()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("========== SectionResult ==========");
+
+            sb.AppendLine($"{nameof(Station),-18} = {Station:F3}");
+            sb.AppendLine($"{nameof(CenterY),-18} = {CenterY:F3}");
+
+            sb.AppendLine($"{nameof(LOuter),-18} = {Fmt(LOuter)}");
+            sb.AppendLine($"{nameof(ROuter),-18} = {Fmt(ROuter)}");
+            sb.AppendLine($"{nameof(LToe),-18}   = {Fmt(LToe)}");
+            sb.AppendLine($"{nameof(RToe),-18}   = {Fmt(RToe)}");
+
+            sb.AppendLine($"{nameof(Ground),-18} =");
+            sb.Append(Fmt(Ground));
+            sb.AppendLine($"{nameof(Cleared),-18} =");
+            sb.Append(Fmt(Cleared));
+            sb.AppendLine($"{nameof(Design),-18} =");
+            sb.Append(Fmt(Design));
+            sb.AppendLine($"{nameof(LeftSubgrade),-18} =");
+            sb.Append(Fmt(LeftSubgrade));
+            sb.AppendLine($"{nameof(RightSubgrade),-18} =");
+            sb.Append(Fmt(RightSubgrade));
+
+            sb.AppendLine($"{nameof(Layers),-18} = List<double[,]> (Count = {Layers?.Count ?? 0})");
+            if (Layers != null)
+            {
+                for (int k = 0; k < Layers.Count; k++)
+                {
+                    sb.AppendLine($"  [{k}]");
+                    sb.Append(Fmt(Layers[k]));
+                }
+            }
+
+            sb.AppendLine($"{nameof(LeftSlabs),-18} =");
+            sb.Append(Fmt(LeftSlabs));
+            sb.AppendLine($"{nameof(RightSlabs),-18} =");
+            sb.Append(Fmt(RightSlabs));
+
+            sb.AppendLine($"{nameof(LeftSlopeRaw),-18} =");
+            sb.Append(Fmt(LeftSlopeRaw));
+            sb.AppendLine($"{nameof(LeftSlopeTrimmed),-18} =");
+            sb.Append(Fmt(LeftSlopeTrimmed));
+            sb.AppendLine($"{nameof(RightSlopeRaw),-18} =");
+            sb.Append(Fmt(RightSlopeRaw));
+            sb.AppendLine($"{nameof(RightSlopeTrimmed),-18} =");
+            sb.Append(Fmt(RightSlopeTrimmed));
+
+            sb.AppendLine($"{nameof(FillArea),-18}  = {FillArea:F3}");
+            sb.AppendLine($"{nameof(CutArea),-18}   = {CutArea:F3}");
+            sb.AppendLine($"{nameof(ClearArea),-18} = {ClearArea:F3}");
+
+            sb.AppendLine($"{nameof(LayerAreas),-18} = List<string> (Count = {LayerAreas?.Count ?? 0})");
+            if (LayerAreas != null)
+            {
+                for (int k = 0; k < LayerAreas.Count; k++)
+                    sb.AppendLine($"  [{k}] {LayerAreas[k]}");
+            }
+
+            sb.AppendLine($"{nameof(Bounds),-18} = {Fmt(Bounds)}");
+
+            sb.AppendLine("===================================");
+            return sb.ToString();
+        }
+
+        private static string Fmt(double v) => v.ToString("F3");
+
+        private static string Fmt(double[] a)
+        {
+            if (a == null) return "null";
+            var parts = new string[a.Length];
+            for (int i = 0; i < a.Length; i++)
+                parts[i] = a[i].ToString("F3");
+            return "[" + string.Join(",", parts) + "]";
+        }
+
+        private static string Fmt(double[,] a)
+        {
+            if (a == null) return "    null" + System.Environment.NewLine;
+
+            int rows = a.GetLength(0);
+            int cols = a.GetLength(1);
+            var sb = new System.Text.StringBuilder();
+
+            for (int i = 0; i < rows; i++)
+            {
+                sb.Append("    ");
+                for (int j = 0; j < cols; j++)
+                {
+                    if (j > 0) sb.Append(',');
+                    sb.Append(a[i, j].ToString("F3"));
+                }
+                sb.AppendLine();
+            }
+            return sb.ToString();
+        }
     }
 
     /// <summary>计算结果的包装（成功/失败/错误信息）</summary>

@@ -124,19 +124,18 @@ app.MapGet("/api/fillcut", (string project, double station) =>
 
             // 几何
             geometry = new
-            {
-                ground          = ToJagged(s.Ground),
-                cleared         = ToJagged(s.Cleared),
-                design          = ToJagged(s.Design),
-                finished        = ToJagged(s.Finished),
-                leftSubgrade    = ToJagged(s.LeftSubgrade),
-                rightSubgrade   = ToJagged(s.RightSubgrade),
-                layerPolygons   = layerPolys,
-                leftSlopeRaw    = ToJagged(s.LeftSlopeRaw),
-                leftSlopeTrim   = ToJagged(s.LeftSlopeTrimmed),
-                rightSlopeRaw   = ToJagged(s.RightSlopeRaw),
-                rightSlopeTrim  = ToJagged(s.RightSlopeTrimmed)
-            }
+{
+    ground        = ToJagged(s.Ground),
+    cleared       = ToJagged(s.Cleared),
+    design        = ToJagged(s.Design),
+    leftSubgrade  = ToJagged(s.LeftSubgrade),
+    rightSubgrade = ToJagged(s.RightSubgrade),
+    layerPolygons = layerPolys,
+    leftSlopeRaw  = ToJagged(s.LeftSlopeRaw),
+    leftSlopeTrim = ToJagged(s.LeftSlopeTrimmed),
+    rightSlopeRaw = ToJagged(s.RightSlopeRaw),
+    rightSlopeTrim= ToJagged(s.RightSlopeTrimmed)
+}
         });
     }
     catch (Exception ex)

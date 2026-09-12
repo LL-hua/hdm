@@ -77,36 +77,6 @@
   button:hover { background: #0066b4; }
   button:disabled { background: #999; cursor: wait; }
 
-  .content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-height: 0;
-  }
-
-  .stat-row {
-    flex-shrink: 0;
-    background: #fff;
-    border-radius: 8px;
-    padding: 6px 10px;
-    display: none;
-    flex-wrap: wrap;
-    gap: 2px 14px;
-    align-items: baseline;
-    box-shadow: 0 1px 3px rgba(0,0,0,.08);
-    font-size: 13px;
-    line-height: 1.8;
-  }
-  .stat-row.show { display: flex; }
-  .stat-row .item { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
-  .stat-row .item .k { color: #666; font-size: 11px; }
-  .stat-row .item .v { font-weight: 600; }
-  .stat-row .item .v.station { color: #0078d4; }
-  .stat-row .item .v.fill { color: #2a8; }
-  .stat-row .item .v.cut { color: #d33; }
-  .stat-row .item .v.clear { color: #888; }
-
   .chart-card {
     flex: 1;
     background: #fff;
@@ -187,14 +157,10 @@
     <button id="queryBtn" onclick="doQuery()">查询</button>
   </div>
 
-  <div class="content">
-    <div class="stat-row" id="resultCard"></div>
-
-    <div class="chart-card">
-      <canvas id="cv"></canvas>
-      <button id="resetBtn" class="reset-btn">⤢ 重置</button>
-      <div class="chart-hint">双指缩放 / 拖动 / 双击放大</div>
-    </div>
+  <div class="chart-card">
+    <canvas id="cv"></canvas>
+    <button id="resetBtn" class="reset-btn">⤢ 重置</button>
+    <div class="chart-hint">双指缩放 / 拖动 / 双击放大</div>
   </div>
 </main>
 
@@ -434,7 +400,6 @@ async function doQuery() {
   const project = document.getElementById('projectSel').value;
   const stationStr = document.getElementById('stationInput').value;
   const btn = document.getElementById('queryBtn');
-  const card = document.getElementById('resultCard');
 
   hideError();
   if (!project) { showError('请选择项目'); return; }
@@ -445,21 +410,11 @@ async function doQuery() {
   btn.disabled = true;
   btn.textContent = '...';
 
-  // ★ 查询前先清空（结果卡片 + 画布）
   clearAll();
 
   try {
     const res = await api(`/api/fillcut?project=${encodeURIComponent(project)}&station=${station}`);
     if (!res.ok) { showError(res.error || '计算失败'); return; }
-
-    card.innerHTML = `
-      <div class="item"><span class="k">桩号</span><span class="v station">${res.stationK}</span></div>
-      <div class="item"><span class="k">填方</span><span class="v fill">${res.fill.toFixed(3)}</span></div>
-      <div class="item"><span class="k">挖方</span><span class="v cut">${res.cut.toFixed(3)}</span></div>
-      <div class="item"><span class="k">清表</span><span class="v clear">${res.clear.toFixed(3)}</span></div>
-      <div class="item"><span class="k">中桩</span><span class="v">${res.centerY.toFixed(3)}</span></div>
-    `;
-    card.classList.add('show');
 
     if (res.geometry) {
       currentData = res;
@@ -473,14 +428,8 @@ async function doQuery() {
   }
 }
 
-// ★ 清空结果卡片 + 画布
 function clearAll() {
-  const card = document.getElementById('resultCard');
-  card.classList.remove('show');
-  card.innerHTML = '';
-
   currentData = null;
-
   if (ctx && canvasW && canvasH) {
     ctx.clearRect(0, 0, canvasW, canvasH);
     ctx.fillStyle = '#fff';
@@ -505,6 +454,9 @@ const ctx = cv.getContext('2d');
 let currentData = null;
 let canvasW = 0, canvasH = 0;
 let dpr = window.devicePixelRatio || 1;
+
+// 当前断面世界宽度（由 fitToCanvas 设置，用于算字号）
+let viewWorldW = 1;
 
 function worldToCanvas(wx, wy, transform) {
   return [
@@ -552,7 +504,15 @@ function render(transform) {
   const g = currentData.geometry;
   const res = currentData;
 
-  // 结构层多边形（底层）
+  // 字号：按世界宽度比例（缩放时自动跟随）
+  const fontWorld = viewWorldW * 0.02;
+  const fontPx = Math.max(1, fontWorld * transform.scale);
+
+  // 顶面标注偏移（世界坐标，跟缩放一致）
+  const offsetWorld = 0.2;
+  const offsetScreen = offsetWorld * transform.scale;
+
+  // ---------- 结构层 ----------
   if (g.layerPolygons) {
     g.layerPolygons.forEach((poly, i) => {
       const fill = i % 2 === 0 ? '#cfe4f7' : '#e8f0f8';
@@ -561,37 +521,153 @@ function render(transform) {
     });
   }
 
-  // 地面线（绿）
+  // ---------- 折线 ----------
   if (g.ground) drawPolyline(g.ground, transform, '#0a0', 2);
-  // 清表线（灰虚线）
   if (g.cleared) drawPolyline(g.cleared, transform, '#888', 1, [4, 3]);
-  // 设计线（红）
   if (g.design) drawPolyline(g.design, transform, '#d00', 2.5);
-  // 完工线（黄）
-  if (g.finished) drawPolyline(g.finished, transform, '#cc0', 1.5);
 
-  // 中桩设计高程
-  if (res.centerY !== undefined) {
-    const [px, py] = worldToCanvas(0, res.centerY, transform);
-    ctx.font = '13px sans-serif';
-    ctx.fillStyle = '#0078d4';
-    ctx.textAlign = 'center';
-    ctx.fillText(res.centerY.toFixed(3), px, py - 6);
+  // ---------- 顶面三点标注（竖直） ----------
+  function labelVertical(worldPt, lines, color) {
+    const [sx, sy] = worldToCanvas(worldPt[0], worldPt[1], transform);
+    const baseY = sy - offsetScreen;
+
+    ctx.save();
+    ctx.translate(sx, baseY);
+    ctx.rotate(-Math.PI / 2);
+    ctx.font = fontPx + 'px sans-serif';
+    ctx.fillStyle = color;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    const lineGap = fontPx * 1.1;
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], 0, i * lineGap);
+    }
+    ctx.restore();
   }
 
-  // 左上角：桩号 + 面积
+  // 左顶面：先宽度后高程
+  if (res.lOuter) {
+    const w = Math.abs(res.lOuter[0] - 0).toFixed(3);
+    labelVertical(res.lOuter, ['w=' + w, res.lOuter[1].toFixed(3)], '#0078d4');
+  }
+
+  // 中桩：只有高程
+  if (res.centerY !== undefined) {
+    labelVertical([0, res.centerY], [res.centerY.toFixed(3)], '#0078d4');
+  }
+
+  // 右顶面：先宽度后高程
+  if (res.rOuter) {
+    const w = Math.abs(res.rOuter[0] - 0).toFixed(3);
+    labelVertical(res.rOuter, ['w=' + w, res.rOuter[1].toFixed(3)], '#0078d4');
+  }
+
+  // ---------- 边坡标注 ----------
+  function labelSlope(pts, color) {
+    if (!pts || pts.length < 2) return;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const x1 = pts[i][0], y1 = pts[i][1];
+      const x2 = pts[i + 1][0], y2 = pts[i + 1][1];
+      const dx = x2 - x1, dy = y2 - y1;
+      if (Math.abs(dy) < 1e-6) continue;
+
+      const ratio = Math.abs(dx / dy);
+      const label = '1:' + ratio.toFixed(2);
+
+      const mx = (x1 + x2) / 2;
+      const my = (y1 + y2) / 2;
+
+      const angleCanvas = -Math.atan2(dy, dx);
+      const [sx, sy] = worldToCanvas(mx, my, transform);
+
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(angleCanvas);
+      ctx.font = fontPx + 'px sans-serif';
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(label, 0, 0);
+      ctx.restore();
+    }
+  }
+
+  if (g.leftSlopeTrim) labelSlope(g.leftSlopeTrim, '#d00');
+  if (g.rightSlopeTrim) labelSlope(g.rightSlopeTrim, '#d00');
+
+  // ---------- 顶面横坡标注 ----------
+  // 从中桩 (0, centerY) 出发，用 slabs 的宽度 + 横坡算位置
+  // 文字方向统一"从左往右看"：
+  //   左侧板块（从中桩往左铺），从左往右看是"上升" → 视觉斜率 = -slope
+  //   右侧板块（从中桩往右铺），从左往右看是"下降" → 视觉斜率 = slope
+  function labelCrossfall(slabs, startX, startY, isLeft, color) {
+    if (!slabs || slabs.length === 0) return;
+    let curX = startX, curY = startY;
+
+    // 左侧：slabs 是 [最外, ..., 最内]，倒序从中桩往外走
+    // 右侧：slabs 是 [最内, ..., 最外]，正序从中桩往外走
+    const idxs = isLeft
+      ? [...slabs.keys()].reverse()
+      : [...slabs.keys()];
+
+    for (const i of idxs) {
+      const w = slabs[i][0];
+      const slope = slabs[i][1];   // %（相对"往外"的方向）
+
+      // 中点
+      const midX = isLeft ? curX - w / 2 : curX + w / 2;
+      const midY = curY + (w / 2) * (slope / 100);
+
+      // 视觉斜率（从左往右看）
+      const visualSlope = isLeft ? -slope : slope;
+
+      // 文字角度：沿视觉斜率（从左到右，向右倾斜）
+      const angleCanvas = -Math.atan2(visualSlope / 100, 1);
+
+      // 沿法向往上偏（世界坐标 0.3 米）
+      const norm = Math.hypot(1, visualSlope / 100);
+      const nx = -(visualSlope / 100) / norm;
+      const ny = 1 / norm;
+      const offsetNormal = 0.3;
+      const mx2 = midX + nx * offsetNormal;
+      const my2 = midY + ny * offsetNormal;
+
+      const [sx, sy] = worldToCanvas(mx2, my2, transform);
+
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(angleCanvas);
+      ctx.font = fontPx + 'px sans-serif';
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(slope.toFixed(2) + '%', 0, 0);
+      ctx.restore();
+
+      // 更新到下个板块起点
+      curX = isLeft ? curX - w : curX + w;
+      curY = curY + w * (slope / 100);
+    }
+  }
+
+  if (res.leftSlabs) labelCrossfall(res.leftSlabs, 0, res.centerY, true, '#0050a0');
+  if (res.rightSlabs) labelCrossfall(res.rightSlabs, 0, res.centerY, false, '#0050a0');
+
+  // ---------- 左上角：桩号 + 面积 ----------
   ctx.font = 'bold 14px sans-serif';
   ctx.fillStyle = '#333';
   ctx.textAlign = 'left';
-  ctx.fillText(res.stationK, 10, 20);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(res.stationK, 10, 22);
 
   ctx.font = '12px sans-serif';
   ctx.fillStyle = '#2a8';
-  ctx.fillText('填 ' + res.fill.toFixed(3) + ' ㎡', 10, 38);
+  ctx.fillText('填 ' + res.fill.toFixed(3) + ' ㎡', 10, 42);
   ctx.fillStyle = '#d33';
-  ctx.fillText('挖 ' + res.cut.toFixed(3) + ' ㎡', 10, 54);
+  ctx.fillText('挖 ' + res.cut.toFixed(3) + ' ㎡', 10, 60);
   ctx.fillStyle = '#888';
-  ctx.fillText('清 ' + res.clear.toFixed(3) + ' ㎡', 10, 70);
+  ctx.fillText('清 ' + res.clear.toFixed(3) + ' ㎡', 10, 78);
 }
 
 // ============================================================
@@ -630,7 +706,7 @@ function fitToCanvas(res) {
   const g = res.geometry;
   const allPts = [];
   const push = (arr) => { if (arr) for (const p of arr) allPts.push(p); };
-  push(g.ground); push(g.cleared); push(g.design); push(g.finished);
+  push(g.ground); push(g.cleared); push(g.design);
   if (g.layerPolygons) for (const poly of g.layerPolygons) push(poly);
   if (allPts.length === 0) return;
 
@@ -649,6 +725,7 @@ function fitToCanvas(res) {
 
   const worldW = maxX - minX;
   const worldH = maxY - minY;
+  viewWorldW = worldW;
 
   const scale = Math.min(canvasW / worldW, canvasH / worldH);
   const cx = (minX + maxX) / 2;

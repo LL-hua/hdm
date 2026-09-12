@@ -10,6 +10,38 @@ namespace hdm.Core
         //（hua_Zs 用）
         private static readonly double[] GaussRr = { 0.1739274226, 0.3260725774, 0.3260725774, 0.1739274226 };
         private static readonly double[] GaussVv = { 0.0694318442, 0.3300094782, 0.6699905218, 0.9305681558 };
+public static void PrintRig(double[,] rig)
+{
+    int rows = rig.GetLength(0); // 行数
+    int cols = rig.GetLength(1); // 列数
+
+    for (int i = 0; i < rows; i++)
+    {
+        for (int j = 0; j < cols; j++)
+        {
+            // F3 表示保留三位小数
+            Console.Write($"{rig[i, j]:F3}");
+            
+            // 列之间用制表符或空格分隔
+            if (j < cols - 1)
+                Console.Write(",");
+        }
+        Console.WriteLine(); // 换行
+    }
+}
+public static void PrintRig(double[] rig)
+{
+    for (int i = 0; i < rig.Length; i++)
+    {
+        // F3 表示保留三位小数
+        Console.Write($"{rig[i]:F3}");
+
+        // 元素之间用制表符分隔
+        if (i < rig.Length - 1)
+            Console.Write(",");
+    }
+    Console.WriteLine(); // 换行
+}
 /// <summary>
 /// 按指定列对 double[,] 原地升序排序（行跟着走）。
 /// 例：SortRowsByColumn(records, 0) 按第 0 列排序。
