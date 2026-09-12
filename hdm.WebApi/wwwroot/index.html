@@ -202,9 +202,6 @@
 
 <!-- 手势控制器 -->
 <script>
-/**
- * GestureController - 纯手势交互控制
- */
 class GestureController {
     constructor(element, options = {}) {
         this.element = element;
@@ -447,7 +444,9 @@ async function doQuery() {
 
   btn.disabled = true;
   btn.textContent = '...';
-  card.classList.remove('show');
+
+  // ★ 查询前先清空（结果卡片 + 画布）
+  clearAll();
 
   try {
     const res = await api(`/api/fillcut?project=${encodeURIComponent(project)}&station=${station}`);
@@ -474,6 +473,21 @@ async function doQuery() {
   }
 }
 
+// ★ 清空结果卡片 + 画布
+function clearAll() {
+  const card = document.getElementById('resultCard');
+  card.classList.remove('show');
+  card.innerHTML = '';
+
+  currentData = null;
+
+  if (ctx && canvasW && canvasH) {
+    ctx.clearRect(0, 0, canvasW, canvasH);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+  }
+}
+
 function showError(msg) {
   const el = document.getElementById('errorCard');
   el.textContent = msg;
@@ -488,12 +502,10 @@ function hideError() { document.getElementById('errorCard').classList.remove('sh
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 
-let currentData = null;   // 当前断面数据
-let worldBounds = null;   // { minX, maxX, minY, maxY }
+let currentData = null;
 let canvasW = 0, canvasH = 0;
 let dpr = window.devicePixelRatio || 1;
 
-// 世界坐标 → canvas 像素
 function worldToCanvas(wx, wy, transform) {
   return [
     wx * transform.scale + transform.offsetX,
@@ -501,7 +513,6 @@ function worldToCanvas(wx, wy, transform) {
   ];
 }
 
-// 画折线
 function drawPolyline(pts, transform, color, width, dash) {
   if (!pts || pts.length < 2) return;
   ctx.beginPath();
@@ -518,7 +529,6 @@ function drawPolyline(pts, transform, color, width, dash) {
   ctx.setLineDash([]);
 }
 
-// 画多边形（填充 + 描边）
 function drawPolygon(pts, transform, fill, stroke, width) {
   if (!pts || pts.length < 3) return;
   ctx.beginPath();
@@ -532,7 +542,6 @@ function drawPolygon(pts, transform, fill, stroke, width) {
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width || 1; ctx.stroke(); }
 }
 
-// 主绘制
 function render(transform) {
   if (!currentData) return;
 
@@ -554,17 +563,14 @@ function render(transform) {
 
   // 地面线（绿）
   if (g.ground) drawPolyline(g.ground, transform, '#0a0', 2);
-
   // 清表线（灰虚线）
   if (g.cleared) drawPolyline(g.cleared, transform, '#888', 1, [4, 3]);
-
   // 设计线（红）
-  if (g.finalDesign) drawPolyline(g.finalDesign, transform, '#d00', 2.5);
-
+  if (g.design) drawPolyline(g.design, transform, '#d00', 2.5);
   // 完工线（黄）
-  if (g.finalFinished) drawPolyline(g.finalFinished, transform, '#cc0', 1.5);
+  if (g.finished) drawPolyline(g.finished, transform, '#cc0', 1.5);
 
-  // ---- 中桩设计高程 ----
+  // 中桩设计高程
   if (res.centerY !== undefined) {
     const [px, py] = worldToCanvas(0, res.centerY, transform);
     ctx.font = '13px sans-serif';
@@ -573,7 +579,7 @@ function render(transform) {
     ctx.fillText(res.centerY.toFixed(3), px, py - 6);
   }
 
-  // ---- 左上角：桩号 + 面积 ----
+  // 左上角：桩号 + 面积
   ctx.font = 'bold 14px sans-serif';
   ctx.fillStyle = '#333';
   ctx.textAlign = 'left';
@@ -589,7 +595,7 @@ function render(transform) {
 }
 
 // ============================================================
-// Canvas 尺寸自适应
+// 尺寸自适应
 // ============================================================
 function resizeCanvas() {
   const rect = cv.getBoundingClientRect();
@@ -607,7 +613,7 @@ window.addEventListener('resize', () => {
 });
 
 // ============================================================
-// 手势实例
+// 手势
 // ============================================================
 const gesture = new GestureController(cv, {
   minScale: 0.01,
@@ -618,13 +624,13 @@ const gesture = new GestureController(cv, {
 });
 
 // ============================================================
-// 自动 fit：让断面正好铺满 canvas
+// fit
 // ============================================================
 function fitToCanvas(res) {
   const g = res.geometry;
   const allPts = [];
   const push = (arr) => { if (arr) for (const p of arr) allPts.push(p); };
-  push(g.ground); push(g.cleared); push(g.finalDesign); push(g.finalFinished);
+  push(g.ground); push(g.cleared); push(g.design); push(g.finished);
   if (g.layerPolygons) for (const poly of g.layerPolygons) push(poly);
   if (allPts.length === 0) return;
 
@@ -645,18 +651,12 @@ function fitToCanvas(res) {
   const worldH = maxY - minY;
 
   const scale = Math.min(canvasW / worldW, canvasH / worldH);
-
-  // 世界中心
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
 
-  // 让世界中心 (cx, cy) 映射到 canvas 中心 (canvasW/2, canvasH/2)
-  // px = cx * scale + offsetX = canvasW / 2
-  // py = -cy * scale + offsetY = canvasH / 2
   const offsetX = canvasW / 2 - cx * scale;
   const offsetY = canvasH / 2 + cy * scale;
 
-  worldBounds = { minX, maxX, minY, maxY };
   gesture.setTransform(offsetX, offsetY, scale);
   render(gesture.transform);
 }
@@ -666,7 +666,6 @@ function drawAndFit(res) {
   fitToCanvas(res);
 }
 
-// 重置按钮
 document.getElementById('resetBtn').addEventListener('click', () => {
   if (currentData) fitToCanvas(currentData);
 });

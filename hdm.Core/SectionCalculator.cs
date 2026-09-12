@@ -9,24 +9,15 @@ namespace hdm.Core
     /// </summary>
     public class SectionCalculator
     {
-    /**
-            var leftWidths = LuJiYaoSuYinQing.ParseFile(左板块);
-            var rightWidths = LuJiYaoSuYinQing.ParseFile(右板块);
-            var slopeData = BianPoYinQing.ParseFile(bp);
-            var leftCrossfalls = LumianSlopeManager.ParseFile(左结构层横坡);
-            var rightCrossfalls = LumianSlopeManager.ParseFile(右结构层横坡);
-            var leftStructures = LeftJiegoucengManager.ParseFile(左结构层);
-            var rightStructures = RightJiegoucengManager.ParseFile(右结构层);
-**/
-        private readonly double[][] _mesh;//断面记录
-        private readonly double[,] _pqx;//设计平曲线
-        private readonly double[,] _sqx;//设计数曲线
-        private readonly List<DuanMianShuJu> _leftWidths;//设计左幅顶面各板块 ∆x,∆y....
-        private readonly List<DuanMianShuJu> _rightWidths;//设计右顶面各板块 ∆x,∆y....
-        private readonly List<BianPoDuanLuo> _slopeData;//边坡
-        private readonly List<CrossfallRecord> _leftCrossfalls;//左侧结构层横坡
-        private readonly List<CrossfallRecord> _rightCrossfalls;//右结构层横坡
-        private readonly List<LeftJiegoucengConfig> _leftStructures;//结构层
+        private readonly double[][] _mesh;
+        private readonly double[,] _pqx;
+        private readonly double[,] _sqx;
+        private readonly List<DuanMianShuJu> _leftWidths;
+        private readonly List<DuanMianShuJu> _rightWidths;
+        private readonly List<BianPoDuanLuo> _slopeData;
+        private readonly double[,] _leftCrossfalls;
+        private readonly double[,] _rightCrossfalls;
+        private readonly List<LeftJiegoucengConfig> _leftStructures;
         private readonly List<RightJiegoucengConfig> _rightStructures;
         private readonly double _clearDepth;
 
@@ -37,8 +28,8 @@ namespace hdm.Core
             List<DuanMianShuJu> leftWidths,
             List<DuanMianShuJu> rightWidths,
             List<BianPoDuanLuo> slopeData,
-            List<CrossfallRecord> leftCrossfalls,
-            List<CrossfallRecord> rightCrossfalls,
+            double[,] leftCrossfalls,
+            double[,] rightCrossfalls,
             List<LeftJiegoucengConfig> leftStructures,
             List<RightJiegoucengConfig> rightStructures,
             double clearDepth)
@@ -61,16 +52,25 @@ namespace hdm.Core
             double centerY = LL.hua_H(_sqx, station);
 
             var dao = LuJiYaoSuYinQing.getcrosectonxy(station, centerY, _leftWidths, _rightWidths);
-            if (dao.ZuoCeCheDaoJueDui.Count == 0 || dao.YouCeCheDaoJueDui.Count == 0)
+
+            // 左侧 / 右侧点（从左到右）
+            var zuoDian = dao.ZuoCeCheDaoJueDui;   // N×2
+            var youDian = dao.YouCeCheDaoJueDui;
+
+            if (zuoDian == null || zuoDian.GetLength(0) == 0 ||
+                youDian == null || youDian.GetLength(0) == 0)
                 return new ComputeResult { Success = false, ErrorMessage = "路基宽度数据缺失" };
 
-            double lOuterX = dao.ZuoCeCheDaoJueDui[0].WidthX;
-            double lOuterY = dao.ZuoCeCheDaoJueDui[0].GaoChengY;
-            double rOuterX = dao.YouCeCheDaoJueDui[^1].WidthX;
-            double rOuterY = dao.YouCeCheDaoJueDui[^1].GaoChengY;
+            // 左外缘 = 左侧第一个点（最左）
+            double lOuterX = zuoDian[0, 0];
+            double lOuterY = zuoDian[0, 1];
+
+            // 右外缘 = 右侧最后一个点（最右）
+            int nYou = youDian.GetLength(0);
+            double rOuterX = youDian[nYou - 1, 0];
+            double rOuterY = youDian[nYou - 1, 1];
 
             double[,] ground = LL.getMatchedBZ(_mesh, station);
-
             if (ground == null || ground.GetLength(0) == 0)
                 return new ComputeResult { Success = false, ErrorMessage = "地面线为空" };
 
@@ -86,57 +86,78 @@ namespace hdm.Core
             double rGroundY = LL.FromXgetY(ground, rOuterX);
             var finalRight = (rOuterY > rGroundY) ? candidates.YouTianJueDui : candidates.YouWaJueDui;
 
+            // ---------- 拼设计线（未裁剪）----------
             var rawDesign = new List<double[]>();
-            if (finalLeft != null) rawDesign.AddRange(finalLeft);
-            foreach (var p in dao.ZuoCeCheDaoJueDui) rawDesign.Add(new[] { p.WidthX, p.GaoChengY });
+            if (finalLeft != null)
+                for (int i = 0; i < finalLeft.GetLength(0); i++)
+                    rawDesign.Add(new[] { finalLeft[i, 0], finalLeft[i, 1] });
+
+            for (int i = 0; i < zuoDian.GetLength(0); i++)
+                rawDesign.Add(new[] { zuoDian[i, 0], zuoDian[i, 1] });
+
             rawDesign.Add(new[] { 0.0, centerY });
-            foreach (var p in dao.YouCeCheDaoJueDui) rawDesign.Add(new[] { p.WidthX, p.GaoChengY });
-            if (finalRight != null) rawDesign.AddRange(finalRight);
+
+            for (int i = 0; i < youDian.GetLength(0); i++)
+                rawDesign.Add(new[] { youDian[i, 0], youDian[i, 1] });
+
+            if (finalRight != null)
+                for (int i = 0; i < finalRight.GetLength(0); i++)
+                    rawDesign.Add(new[] { finalRight[i, 0], finalRight[i, 1] });
+
             double[,] designTop = ToMat(rawDesign);
 
+            // ---------- 左结构层 ----------
             double leftCrossfall = LumianSlopeManager.InterpolateCrossfall(_leftCrossfalls, station);
-            var leftCenter = new LeftPoint2D(0.0, centerY);
-            LeftPoint2D[] leftSubgrade;
+            var leftCenter = new double[] { 0.0, centerY };
+            double[,] leftSubgrade;
             var leftPolygons = LeftJiegoucengManager.ComputeCoordinates(
                 station, leftCenter, leftCrossfall, _leftStructures, out leftSubgrade);
 
             if (leftPolygons.Count == 0)
                 return new ComputeResult { Success = false, ErrorMessage = "左幅结构层段落为空" };
 
-            double leftInnerX = leftSubgrade[leftSubgrade.Length - 1].X;
+            // 用左结构层最内侧点反查设计线高 → 修正 centerY
+            double leftInnerX = leftSubgrade[leftSubgrade.GetLength(0) - 1, 0];
             double newH = LL.FromXgetY(designTop, leftInnerX);
-            leftCenter = new LeftPoint2D(0.0, newH);
+            leftCenter = new double[] { 0.0, newH };
             leftPolygons = LeftJiegoucengManager.ComputeCoordinates(
                 station, leftCenter, leftCrossfall, _leftStructures, out leftSubgrade);
 
+            // ---------- 右结构层 ----------
             double rightCrossfall = LumianSlopeManager.InterpolateCrossfall(_rightCrossfalls, station);
-            var rightCenter = new RightPoint2D(0.0, centerY);
-            RightPoint2D[] rightSubgrade;
+            var rightCenter = new double[] { 0.0, centerY };
+            double[,] rightSubgrade;
             var rightPolygons = RightJiegoucengManager.ComputeCoordinates(
                 station, rightCenter, rightCrossfall, _rightStructures, out rightSubgrade);
 
             if (rightPolygons.Count == 0)
                 return new ComputeResult { Success = false, ErrorMessage = "右幅结构层段落为空" };
 
-            double rightInnerX = rightSubgrade[0].X;
+            double rightInnerX = rightSubgrade[0, 0];
             newH = LL.FromXgetY(designTop, rightInnerX);
-            rightCenter = new RightPoint2D(0.0, newH);
+            rightCenter = new double[] { 0.0, newH };
             rightPolygons = RightJiegoucengManager.ComputeCoordinates(
                 station, rightCenter, rightCrossfall, _rightStructures, out rightSubgrade);
 
-            double leftOuterAnchor = leftSubgrade.Length > 0 ? leftSubgrade[0].X : lOuterX;
-            double rightOuterAnchor = rightSubgrade.Length > 0 ? rightSubgrade[rightSubgrade.Length - 1].X : rOuterX;
+            // ---------- 拼最终设计线 + 完工线 ----------
+            double leftOuterAnchor = leftSubgrade.GetLength(0) > 0 ? leftSubgrade[0, 0] : lOuterX;
+            double rightOuterAnchor = rightSubgrade.GetLength(0) > 0
+                ? rightSubgrade[rightSubgrade.GetLength(0) - 1, 0] : rOuterX;
 
             var designList = new List<double[]>();
             var finishedList = new List<double[]>();
 
             AddOuterPart(rawDesign, designList, finishedList, leftOuterAnchor, -1);
-            if (leftSubgrade != null)
-                foreach (var p in leftSubgrade) designList.Add(new[] { p.X, p.Y });
-            foreach (var p in dao.ZuoCeCheDaoJueDui) finishedList.Add(new[] { p.WidthX, p.GaoChengY });
 
-            double leftInnerAnchor = leftSubgrade[leftSubgrade.Length - 1].X;
-            double rightInnerAnchor = rightSubgrade[0].X;
+            if (leftSubgrade != null)
+                for (int i = 0; i < leftSubgrade.GetLength(0); i++)
+                    designList.Add(new[] { leftSubgrade[i, 0], leftSubgrade[i, 1] });
+
+            for (int i = 0; i < zuoDian.GetLength(0); i++)
+                finishedList.Add(new[] { zuoDian[i, 0], zuoDian[i, 1] });
+
+            double leftInnerAnchor = leftSubgrade[leftSubgrade.GetLength(0) - 1, 0];
+            double rightInnerAnchor = rightSubgrade[0, 0];
             foreach (var p in rawDesign)
                 if (p[0] >= leftInnerAnchor && p[0] <= rightInnerAnchor)
                 {
@@ -145,13 +166,17 @@ namespace hdm.Core
                 }
 
             if (rightSubgrade != null)
-                foreach (var p in rightSubgrade) designList.Add(new[] { p.X, p.Y });
-            foreach (var p in dao.YouCeCheDaoJueDui) finishedList.Add(new[] { p.WidthX, p.GaoChengY });
+                for (int i = 0; i < rightSubgrade.GetLength(0); i++)
+                    designList.Add(new[] { rightSubgrade[i, 0], rightSubgrade[i, 1] });
+
+            for (int i = 0; i < youDian.GetLength(0); i++)
+                finishedList.Add(new[] { youDian[i, 0], youDian[i, 1] });
 
             AddOuterPart(rawDesign, designList, finishedList, rightOuterAnchor, 1);
 
             double[,] designMat = ToMat(designList);
 
+            // ---------- 算面积 ----------
             var res = LL.hua_CutAndFillArea(cleared, designMat, 8);
             double fill = Math.Abs(res[0]), cut = Math.Abs(res[1]);
             double minX = res[2], maxX = res[3], minY = res[4];
@@ -170,15 +195,18 @@ namespace hdm.Core
                 finalDesign[i, 1] = res[idx++];
             }
 
-            double minTrim = finalDesign[0, 0], maxTrim = finalDesign[finalDesign.GetLength(0) - 1, 0];
+            double minTrim = finalDesign[0, 0];
+            double maxTrim = finalDesign[finalDesign.GetLength(0) - 1, 0];
             var trimmedFinished = new List<double[]>();
             foreach (var p in finishedList)
                 if (p[0] >= minTrim && p[0] <= maxTrim) trimmedFinished.Add(p);
             double[,] finalFinished = ToMat(trimmedFinished);
 
+            // ---------- 结构层面积 + 多边形 ----------
             var layerAreaTexts = new List<string>();
             var layerPolygons = new List<double[,]>();
 
+            // 清表线裁剪（保留 [minX, maxX] 内）
             var temp = new List<double[]>();
             for (int i = 0; i < cleared.GetLength(0); i++)
             {
@@ -186,7 +214,6 @@ namespace hdm.Core
                 if (x >= minX && x <= maxX)
                     temp.Add(new double[] { x, cleared[i, 1] });
             }
-
             int n = temp.Count;
             double[,] cleared1 = new double[n + 2, 2];
             cleared1[0, 0] = finalDesign[0, 0];
@@ -202,9 +229,7 @@ namespace hdm.Core
             if (leftPolygons != null)
                 for (int i = 0; i < leftPolygons.Count; i++)
                 {
-                    var pts = leftPolygons[i];
-                    double[,] poly = new double[pts.Length, 2];
-                    for (int j = 0; j < pts.Length; j++) { poly[j, 0] = pts[j].X; poly[j, 1] = pts[j].Y; }
+                    var poly = leftPolygons[i];
                     double area = Math.Abs(LL.hua_PolygonArea(poly));
                     string name = (i < _leftStructures.Count && !string.IsNullOrEmpty(_leftStructures[i].LayerName))
                         ? _leftStructures[i].LayerName : $"L_Lay{i + 1}";
@@ -215,9 +240,7 @@ namespace hdm.Core
             if (rightPolygons != null)
                 for (int i = 0; i < rightPolygons.Count; i++)
                 {
-                    var pts = rightPolygons[i];
-                    double[,] poly = new double[pts.Length, 2];
-                    for (int j = 0; j < pts.Length; j++) { poly[j, 0] = pts[j].X; poly[j, 1] = pts[j].Y; }
+                    var poly = rightPolygons[i];
                     double area = Math.Abs(LL.hua_PolygonArea(poly));
                     string name = (i < _rightStructures.Count && !string.IsNullOrEmpty(_rightStructures[i].LayerName))
                         ? _rightStructures[i].LayerName : $"R_Lay{i + 1}";
@@ -225,6 +248,25 @@ namespace hdm.Core
                     layerPolygons.Add(poly);
                 }
 
+            // ---------- 边坡裁剪（从 finalDesign 切）----------
+            var leftTrimmed = new List<double[]>();
+            for (int i = 0; i < finalDesign.GetLength(0); i++)
+            {
+                if (finalDesign[i, 0] <= leftOuterAnchor)
+                    leftTrimmed.Add(new[] { finalDesign[i, 0], finalDesign[i, 1] });
+                else break;
+            }
+
+            var rightTrimmed = new List<double[]>();
+            for (int i = finalDesign.GetLength(0) - 1; i >= 0; i--)
+            {
+                if (finalDesign[i, 0] >= rightOuterAnchor)
+                    rightTrimmed.Add(new[] { finalDesign[i, 0], finalDesign[i, 1] });
+                else break;
+            }
+            rightTrimmed.Reverse();
+
+            // ---------- 组装结果 ----------
             return new ComputeResult
             {
                 Success = true,
@@ -232,50 +274,46 @@ namespace hdm.Core
                 {
                     Station = station,
                     CenterY = centerY,
-                    LOuterX = lOuterX,
-                    LOuterY = lOuterY,
-                    ROuterX = rOuterX,
-                    ROuterY = rOuterY,
-                    LeftCrossfall = leftCrossfall,
-                    RightCrossfall = rightCrossfall,
-                    FinalDesign = finalDesign,
-                    FinalFinished = finalFinished,
+
+                    LOuter = new[] { lOuterX, lOuterY },
+                    ROuter = new[] { rOuterX, rOuterY },
+                    LToe = new[] { finalDesign[0, 0], finalDesign[0, 1] },
+                    RToe = new[] { finalDesign[finalDesign.GetLength(0) - 1, 0], finalDesign[finalDesign.GetLength(0) - 1, 1] },
+
                     Ground = ground,
                     Cleared = cleared1,
-                    LeftSubgrade = SubToMat(leftSubgrade),
-                    RightSubgrade = SubToMat(rightSubgrade),
-                    LayerPolygons = layerPolygons,
-                    LayerAreaTexts = layerAreaTexts,
+                    Design = finalDesign,
+                    Finished = finalFinished,
+                    LeftSubgrade = leftSubgrade,
+                    RightSubgrade = rightSubgrade,
+                    Layers = layerPolygons,
+
+                    LeftSlabs = dao.ZuoBanKuai,
+                    RightSlabs = dao.YouBanKuai,
+
+                    LeftSlopeRaw = finalLeft ?? new double[0, 2],
+                    LeftSlopeTrimmed = ToMat(leftTrimmed),
+                    RightSlopeRaw = finalRight ?? new double[0, 2],
+                    RightSlopeTrimmed = ToMat(rightTrimmed),
+
                     FillArea = fill,
                     CutArea = cut,
                     ClearArea = clearArea,
-                    MinX = minX,
-                    MaxX = maxX,
-                    MinY = minY,
-                    LeftSlopePoints = finalLeft,
-                    RightSlopePoints = finalRight,
-                    LeftToeX = finalDesign[0, 0],
-                    LeftToeY = finalDesign[0, 1],
-                    RightToeX = finalDesign[finalDesign.GetLength(0) - 1, 0],
-                    RightToeY = finalDesign[finalDesign.GetLength(0) - 1, 1]
+                    LayerAreas = layerAreaTexts,
+
+                    Bounds = new[] { minX, minY, maxX, res[5] }
                 }
             };
         }
+
+        // ---------------------------------------------------------
+        // 工具方法
+        // ---------------------------------------------------------
 
         private static double[,] ToMat(List<double[]> list)
         {
             var m = new double[list.Count, 2];
             for (int i = 0; i < list.Count; i++) { m[i, 0] = list[i][0]; m[i, 1] = list[i][1]; }
-            return m;
-        }
-
-        private static double[,] SubToMat(Array arr)
-        {
-            if (arr == null || arr.Length == 0) return new double[0, 0];
-            int n = arr.Length;
-            var m = new double[n, 2];
-            dynamic d = arr;
-            for (int i = 0; i < n; i++) { m[i, 0] = d[i].X; m[i, 1] = d[i].Y; }
             return m;
         }
 

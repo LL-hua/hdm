@@ -4,18 +4,45 @@ using System.Globalization;
 
 namespace hdm.Core
 {
-    /// <summary>
-    /// 工具库（瘦身版）：只保留纯计算真正用到的方法。
-    /// 已删除：DXF 输出、高斯/UTM 投影、四参数转换、GPS 互转、土方量、未调用的几何工具。
-    /// </summary>
     public static class LL
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-
-        // 高斯积分系数（hua_Zs 用）
+        //（hua_Zs 用）
         private static readonly double[] GaussRr = { 0.1739274226, 0.3260725774, 0.3260725774, 0.1739274226 };
         private static readonly double[] GaussVv = { 0.0694318442, 0.3300094782, 0.6699905218, 0.9305681558 };
+/// <summary>
+/// 按指定列对 double[,] 原地升序排序（行跟着走）。
+/// 例：SortRowsByColumn(records, 0) 按第 0 列排序。
+/// </summary>
+public static void SortRowsByColumn(double[,] data, int col)
+{
+    if (data == null) return;
+    int rows = data.GetLength(0);
+    int cols = data.GetLength(1);
+    if (rows <= 1 || col < 0 || col >= cols) return;
 
+    int[] idx = new int[rows];
+    for (int i = 0; i < rows; i++) idx[i] = i;
+
+    Array.Sort(idx, (a, b) => data[a, col].CompareTo(data[b, col]));
+
+    double[] tmp = new double[cols];
+    for (int i = 0; i < rows; i++)
+    {
+        if (idx[i] == i) continue;
+        for (int c = 0; c < cols; c++) tmp[c] = data[i, c];
+        int j = i;
+        while (true)
+        {
+            int k = idx[j];
+            idx[j] = j;
+            if (k == i) break;
+            for (int c = 0; c < cols; c++) data[j, c] = data[k, c];
+            j = k;
+        }
+        for (int c = 0; c < cols; c++) data[j, c] = tmp[c];
+    }
+}
         // ============================================================
         // 1. 桩号 / 角度工具
         // ============================================================

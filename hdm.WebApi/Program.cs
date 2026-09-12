@@ -50,7 +50,7 @@ List<string> ListProjects()
         .ToList();
 }
 
-// ---------- double[,] -> double[][] ----------
+// ---------- double[,] → double[][] ----------
 static double[][] ToJagged(double[,] mat)
 {
     if (mat == null) return Array.Empty<double[]>();
@@ -89,11 +89,10 @@ app.MapGet("/api/fillcut", (string project, double station) =>
         var s = r.Result;
 
         var layerPolys = new List<double[][]>();
-        if (s.LayerPolygons != null)
-            foreach (var poly in s.LayerPolygons)
+        if (s.Layers != null)
+            foreach (var poly in s.Layers)
                 layerPolys.Add(ToJagged(poly));
 
-        // 返回 SectionResult 的全部字段
         return Results.Ok(new
         {
             ok = true,
@@ -101,40 +100,42 @@ app.MapGet("/api/fillcut", (string project, double station) =>
             station,
             stationK = LL.hua_Num2K(station),
 
-            // ---- 位置 ----
+            // 位置
             centerY = s.CenterY,
 
-            // ---- 路基外缘 ----
-            lOuterX = s.LOuterX, lOuterY = s.LOuterY,
-            rOuterX = s.ROuterX, rOuterY = s.ROuterY,
-            leftCrossfall = s.LeftCrossfall,
-            rightCrossfall = s.RightCrossfall,
+            // 关键点（double[] 直接序列化成 JSON 数组）
+            lOuter = s.LOuter,
+            rOuter = s.ROuter,
+            lToe = s.LToe,
+            rToe = s.RToe,
 
-            // ---- 面积 ----
+            // 包围盒 [minX, minY, maxX, maxY]
+            bounds = s.Bounds,
+
+            // 面积
             fill = s.FillArea,
             cut = s.CutArea,
             clear = s.ClearArea,
-            layers = s.LayerAreaTexts,
+            layers = s.LayerAreas,
 
-            // ---- 范围 ----
-            minX = s.MinX, maxX = s.MaxX, minY = s.MinY,
+            // 板块
+            leftSlabs = ToJagged(s.LeftSlabs),
+            rightSlabs = ToJagged(s.RightSlabs),
 
-            // ---- 边坡 ----
-            leftSlopePoints = s.LeftSlopePoints,
-            rightSlopePoints = s.RightSlopePoints,
-            leftToeX = s.LeftToeX, leftToeY = s.LeftToeY,
-            rightToeX = s.RightToeX, rightToeY = s.RightToeY,
-
-            // ---- 几何折线 ----
+            // 几何
             geometry = new
             {
-                ground        = ToJagged(s.Ground),
-                cleared       = ToJagged(s.Cleared),
-                finalDesign   = ToJagged(s.FinalDesign),
-                finalFinished = ToJagged(s.FinalFinished),
-                leftSubgrade  = ToJagged(s.LeftSubgrade),
-                rightSubgrade = ToJagged(s.RightSubgrade),
-                layerPolygons = layerPolys
+                ground          = ToJagged(s.Ground),
+                cleared         = ToJagged(s.Cleared),
+                design          = ToJagged(s.Design),
+                finished        = ToJagged(s.Finished),
+                leftSubgrade    = ToJagged(s.LeftSubgrade),
+                rightSubgrade   = ToJagged(s.RightSubgrade),
+                layerPolygons   = layerPolys,
+                leftSlopeRaw    = ToJagged(s.LeftSlopeRaw),
+                leftSlopeTrim   = ToJagged(s.LeftSlopeTrimmed),
+                rightSlopeRaw   = ToJagged(s.RightSlopeRaw),
+                rightSlopeTrim  = ToJagged(s.RightSlopeTrimmed)
             }
         });
     }

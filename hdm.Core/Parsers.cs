@@ -7,17 +7,15 @@ using System.Text;
 namespace hdm.Core
 {
     // ============================================================
-    // 1. 路基宽度解析（原 LuJiYaoSuYinQing）
+    // 1. 路基宽度解析（LuJiYaoSuYinQing）
     // ============================================================
     public static class LuJiYaoSuYinQing
     {
-        /// <summary>从文件读（跳过表头）</summary>
         public static List<DuanMianShuJu> ParseFile(string filePath)
         {
             return Parse(File.ReadLines(filePath));
         }
 
-        /// <summary>从行集合解析（跳过表头，支持逗号/空格/制表符）</summary>
         public static List<DuanMianShuJu> Parse(IEnumerable<string> lines)
         {
             var jieGuoList = new List<DuanMianShuJu>();
@@ -30,7 +28,7 @@ namespace hdm.Core
                 if (isFirstLine)
                 {
                     isFirstLine = false;
-                    continue; // 跳过表头
+                    continue;
                 }
 
                 string[] tokens = cleanLine.Split(
@@ -54,7 +52,7 @@ namespace hdm.Core
             return jieGuoList;
         }
 
-        /// <summary>按桩号算左右车道绝对坐标（线性插值）</summary>
+        /// <summary>按桩号算左右车道（从左到右）</summary>
         public static LuJiCheDaoJieGuoBao getcrosectonxy(
             double muBiaoZhuangHao,
             double zhongZhuangGaoCheng,
@@ -98,6 +96,9 @@ namespace hdm.Core
                 double curZuoX = 0.0;
                 double curZuoY = zhongZhuangGaoCheng;
 
+                var dianList = new List<double[]>();
+                var banKuaiList = new List<double[]>();
+
                 for (int k = 0; k < dmBefore.BanKuaiJiHe.Count; k++)
                 {
                     if (k >= dmAfter.BanKuaiJiHe.Count) break;
@@ -107,13 +108,27 @@ namespace hdm.Core
                     double sAfter = dmAfter.BanKuaiJiHe[k][1];
 
                     double curWidth = wBefore + ratio * (wAfter - wBefore);
-                    double curSlopeVal = (sBefore + ratio * (sAfter - sBefore)) / 100.0;
+                    double curSlopePercent = sBefore + ratio * (sAfter - sBefore);
+                    double curSlopeVal = curSlopePercent / 100.0;
 
                     curZuoX -= curWidth;
                     curZuoY += (curWidth * curSlopeVal);
-                    jieGuoBao.ZuoCeCheDaoJueDui.Add(new JueDuiBanKuaiDian(curZuoX, curZuoY));
+
+                    dianList.Add(new double[] { curZuoX, curZuoY });
+                    banKuaiList.Add(new double[] { curWidth, curSlopePercent });
                 }
-                jieGuoBao.ZuoCeCheDaoJueDui.Reverse();
+
+                // 反转 → 从左到右
+                dianList.Reverse();
+                banKuaiList.Reverse();
+
+                jieGuoBao.ZuoCeCheDaoJueDui = ListToMat(dianList);
+                jieGuoBao.ZuoBanKuai = ListToMat(banKuaiList);
+            }
+            else
+            {
+                jieGuoBao.ZuoCeCheDaoJueDui = new double[0, 2];
+                jieGuoBao.ZuoBanKuai = new double[0, 2];
             }
 
             // -------- 右侧 --------
@@ -151,6 +166,9 @@ namespace hdm.Core
                 double curYouX = 0.0;
                 double curYouY = zhongZhuangGaoCheng;
 
+                var dianList = new List<double[]>();
+                var banKuaiList = new List<double[]>();
+
                 for (int k = 0; k < dmBefore.BanKuaiJiHe.Count; k++)
                 {
                     if (k >= dmAfter.BanKuaiJiHe.Count) break;
@@ -158,21 +176,46 @@ namespace hdm.Core
                     double sBefore = dmBefore.BanKuaiJiHe[k][1];
                     double wAfter = dmAfter.BanKuaiJiHe[k][0];
                     double sAfter = dmAfter.BanKuaiJiHe[k][1];
+
                     double curWidth = wBefore + ratio * (wAfter - wBefore);
-                    double curSlopeVal = (sBefore + ratio * (sAfter - sBefore)) / 100.0;
+                    double curSlopePercent = sBefore + ratio * (sAfter - sBefore);
+                    double curSlopeVal = curSlopePercent / 100.0;
 
                     curYouX += curWidth;
                     curYouY += (curWidth * curSlopeVal);
-                    jieGuoBao.YouCeCheDaoJueDui.Add(new JueDuiBanKuaiDian(curYouX, curYouY));
+
+                    dianList.Add(new double[] { curYouX, curYouY });
+                    banKuaiList.Add(new double[] { curWidth, curSlopePercent });
                 }
+
+                // 右侧不反转（已是从左到右）
+                jieGuoBao.YouCeCheDaoJueDui = ListToMat(dianList);
+                jieGuoBao.YouBanKuai = ListToMat(banKuaiList);
+            }
+            else
+            {
+                jieGuoBao.YouCeCheDaoJueDui = new double[0, 2];
+                jieGuoBao.YouBanKuai = new double[0, 2];
             }
 
             return jieGuoBao;
         }
+
+        /// <summary>List&lt;double[]&gt; → double[,]</summary>
+        private static double[,] ListToMat(List<double[]> list)
+        {
+            var m = new double[list.Count, 2];
+            for (int i = 0; i < list.Count; i++)
+            {
+                m[i, 0] = list[i][0];
+                m[i, 1] = list[i][1];
+            }
+            return m;
+        }
     }
 
     // ============================================================
-    // 2. 边坡解析（原 BianPoYinQing）
+    // 2. 边坡解析（BianPoYinQing）
     // ============================================================
     public static class BianPoYinQing
     {
@@ -204,7 +247,7 @@ namespace hdm.Core
             return jieGuoJi;
         }
 
-        private static List<double[]> ParseSlopeLine(string line)
+        private static double[,] ParseSlopeLine(string line)
         {
             var list = new List<double[]>();
             string[] tokens = line.Split(',');
@@ -213,7 +256,13 @@ namespace hdm.Core
                 if (j + 1 >= tokens.Length) break;
                 list.Add(new double[] { Convert.ToDouble(tokens[j]), Convert.ToDouble(tokens[j + 1]) });
             }
-            return list;
+            var result = new double[list.Count, 2];
+            for (int i = 0; i < list.Count; i++)
+            {
+                result[i, 0] = list[i][0];
+                result[i, 1] = list[i][1];
+            }
+            return result;
         }
 
         /// <summary>按桩号找段落（左闭右开）</summary>
@@ -234,106 +283,119 @@ namespace hdm.Core
             double youYuanX, double youYuanY)
         {
             var houxuan = new BianPoHouXuanBao();
-            if (dangQianBianPo == null) return houxuan;
-
-            double ztX = zuoYuanX; double ztY = zuoYuanY;
-            foreach (var step in dangQianBianPo.ZuoTian)
+            if (dangQianBianPo == null)
             {
-                ztX += step[0]; ztY += step[1];
-                houxuan.ZuoTianJueDui.Add(new double[] { ztX, ztY });
-            }
-            houxuan.ZuoTianJueDui.Reverse();
-
-            double zwX = zuoYuanX; double zwY = zuoYuanY;
-            foreach (var step in dangQianBianPo.ZuoWa)
-            {
-                zwX += step[0]; zwY += step[1];
-                houxuan.ZuoWaJueDui.Add(new double[] { zwX, zwY });
-            }
-            houxuan.ZuoWaJueDui.Reverse();
-
-            double ytX = youYuanX; double ytY = youYuanY;
-            foreach (var step in dangQianBianPo.YouTian)
-            {
-                ytX += step[0]; ytY += step[1];
-                houxuan.YouTianJueDui.Add(new double[] { ytX, ytY });
+                houxuan.ZuoTianJueDui = new double[0, 2];
+                houxuan.ZuoWaJueDui = new double[0, 2];
+                houxuan.YouTianJueDui = new double[0, 2];
+                houxuan.YouWaJueDui = new double[0, 2];
+                return houxuan;
             }
 
-            double ywX = youYuanX; double ywY = youYuanY;
-            foreach (var step in dangQianBianPo.YouWa)
-            {
-                ywX += step[0]; ywY += step[1];
-                houxuan.YouWaJueDui.Add(new double[] { ywX, ywY });
-            }
+            houxuan.ZuoTianJueDui = Accumulate(dangQianBianPo.ZuoTian, zuoYuanX, zuoYuanY, true);
+            houxuan.ZuoWaJueDui   = Accumulate(dangQianBianPo.ZuoWa,   zuoYuanX, zuoYuanY, true);
+            houxuan.YouTianJueDui = Accumulate(dangQianBianPo.YouTian, youYuanX, youYuanY, false);
+            houxuan.YouWaJueDui   = Accumulate(dangQianBianPo.YouWa,   youYuanX, youYuanY, false);
 
             return houxuan;
+        }
+
+        /// <summary>累加相对位移 → 绝对坐标。reverse=true 时反转（左侧用）</summary>
+        private static double[,] Accumulate(double[,] steps, double startX, double startY, bool reverse)
+        {
+            if (steps == null || steps.GetLength(0) == 0)
+                return new double[0, 2];
+
+            int n = steps.GetLength(0);
+            var result = new double[n, 2];
+            double x = startX, y = startY;
+            for (int i = 0; i < n; i++)
+            {
+                x += steps[i, 0];
+                y += steps[i, 1];
+                result[i, 0] = x;
+                result[i, 1] = y;
+            }
+
+            if (reverse)
+            {
+                for (int i = 0, j = n - 1; i < j; i++, j--)
+                {
+                    double tx = result[i, 0], ty = result[i, 1];
+                    result[i, 0] = result[j, 0]; result[i, 1] = result[j, 1];
+                    result[j, 0] = tx; result[j, 1] = ty;
+                }
+            }
+            return result;
         }
     }
 
     // ============================================================
-    // 3. 横坡解析（原 LumianSlopeManager）
+    // 3. 横坡解析（LumianSlopeManager）
     // ============================================================
     public static class LumianSlopeManager
     {
-        public static List<CrossfallRecord> ParseFile(string filePath)
+        /// <summary>返回 N 行 × 2 列：[桩号, 横坡%]，按桩号升序</summary>
+        public static double[,] ParseFile(string filePath)
         {
             return Parse(File.ReadLines(filePath));
         }
 
-        public static List<CrossfallRecord> Parse(IEnumerable<string> lines)
+        public static double[,] Parse(IEnumerable<string> lines)
         {
-            var records = new List<CrossfallRecord>();
+            var list = new List<double[]>();
             bool first = true;
             foreach (var raw in lines)
             {
-                if (first) { first = false; continue; } // 跳表头
+                if (first) { first = false; continue; }
                 string line = raw.Trim();
                 if (string.IsNullOrEmpty(line) || line.StartsWith("#") || line.StartsWith("//"))
                     continue;
 
                 string[] parts = line.Split(',');
-                records.Add(new CrossfallRecord
-                {
-                    Station = double.Parse(parts[0].Trim()),
-                    Slope = double.Parse(parts[1].Trim())
-                });
+                list.Add(new double[] { double.Parse(parts[0].Trim()), double.Parse(parts[1].Trim()) });
             }
-            records.Sort((a, b) => a.Station.CompareTo(b.Station));
-            return records;
+
+            var result = new double[list.Count, 2];
+            for (int i = 0; i < list.Count; i++)
+            {
+                result[i, 0] = list[i][0];
+                result[i, 1] = list[i][1];
+            }
+            LL.SortRowsByColumn(result, 0);
+            return result;
         }
 
-        /// <summary>横坡线性插值（二分查找）</summary>
-        public static double InterpolateCrossfall(List<CrossfallRecord> records, double currentStation)
+        /// <summary>横坡线性插值（二分查找）。records 为 N×2 [桩号, 横坡%]</summary>
+        public static double InterpolateCrossfall(double[,] records, double currentStation)
         {
-            if (records == null || records.Count == 0) return 0.0;
-            if (records.Count == 1) return records[0].Slope;
+            if (records == null) return 0.0;
+            int n = records.GetLength(0);
+            if (n == 0) return 0.0;
+            if (n == 1) return records[0, 1];
 
-            if (currentStation <= records[0].Station) return records[0].Slope;
-            if (currentStation >= records[records.Count - 1].Station) return records[records.Count - 1].Slope;
+            if (currentStation <= records[0, 0]) return records[0, 1];
+            if (currentStation >= records[n - 1, 0]) return records[n - 1, 1];
 
-            int low = 0;
-            int high = records.Count - 1;
+            int low = 0, high = n - 1;
             while (low <= high)
             {
                 int mid = low + ((high - low) >> 1);
-                double midStation = records[mid].Station;
-                if (Math.Abs(midStation - currentStation) < 0.00001) return records[mid].Slope;
+                double midStation = records[mid, 0];
+                if (Math.Abs(midStation - currentStation) < 0.00001) return records[mid, 1];
                 if (midStation < currentStation) low = mid + 1;
                 else high = mid - 1;
             }
 
-            var left = records[high];
-            var right = records[low];
-            double stationDelta = right.Station - left.Station;
-            if (Math.Abs(stationDelta) < 0.00001) return left.Slope;
-
-            double ratio = (currentStation - left.Station) / stationDelta;
-            return left.Slope + ratio * (right.Slope - left.Slope);
+            double s1 = records[high, 0], v1 = records[high, 1];
+            double s2 = records[low, 0], v2 = records[low, 1];
+            if (Math.Abs(s2 - s1) < 0.00001) return v1;
+            return v1 + (v2 - v1) * (currentStation - s1) / (s2 - s1);
         }
     }
 
     // ============================================================
-    // 4. 左结构层解析（原 LeftJiegoucengManager）
+    // 4. 左结构层解析（LeftJiegoucengManager）
     // ============================================================
     public static class LeftJiegoucengManager
     {
@@ -348,7 +410,7 @@ namespace hdm.Core
             bool first = true;
             foreach (var raw in lines)
             {
-                if (first) { first = false; continue; } // 跳表头
+                if (first) { first = false; continue; }
                 if (string.IsNullOrWhiteSpace(raw)) continue;
                 string[] parts = raw.Split(',');
                 list.Add(new LeftJiegoucengConfig
@@ -367,12 +429,17 @@ namespace hdm.Core
             return list;
         }
 
-        public static List<LeftPoint2D[]> ComputeCoordinates(
-            double station, LeftPoint2D centerPoint, double crossfall,
+        /// <summary>
+        /// 计算左结构层。
+        /// centerPoint = [x, y] 中心点。
+        /// 返回：每个层一个 polygon（double[,]）；subgradeLine 为路基线（double[,]）。
+        /// </summary>
+        public static List<double[,]> ComputeCoordinates(
+            double station, double[] centerPoint, double crossfall,
             List<LeftJiegoucengConfig> configs,
-            out LeftPoint2D[] subgradeLine)
+            out double[,] subgradeLine)
         {
-            var polygons = new List<LeftPoint2D[]>();
+            var polygons = new List<double[,]>();
 
             var activeLayers = configs
                 .Where(cfg => station >= cfg.StartStation && station <= cfg.EndStation)
@@ -381,21 +448,21 @@ namespace hdm.Core
 
             if (activeLayers.Count == 0)
             {
-                subgradeLine = Array.Empty<LeftPoint2D>();
+                subgradeLine = new double[0, 2];
                 return polygons;
             }
 
             int layerCount = activeLayers.Count;
             double k = -crossfall / 100.0;
 
-            var topOutList = new LeftPoint2D[layerCount];
-            var botOutList = new LeftPoint2D[layerCount];
-            var topInList = new LeftPoint2D[layerCount];
-            var botInList = new LeftPoint2D[layerCount];
+            double[] topOutX = new double[layerCount], topOutY = new double[layerCount];
+            double[] botOutX = new double[layerCount], botOutY = new double[layerCount];
+            double[] topInX = new double[layerCount], topInY = new double[layerCount];
+            double[] botInX = new double[layerCount], botInY = new double[layerCount];
 
             var firstLayer = activeLayers[0];
-            double curTopInX = centerPoint.X + firstLayer.InnerStepWidth;
-            double curTopInY = centerPoint.Y;
+            double curTopInX = centerPoint[0] + firstLayer.InnerStepWidth;
+            double curTopInY = centerPoint[1];
 
             double curTopOutX = curTopInX + firstLayer.OuterStepWidth;
             double curTopOutY = curTopInY + (curTopOutX - curTopInX) * k;
@@ -406,59 +473,64 @@ namespace hdm.Core
 
                 if (i > 0)
                 {
-                    curTopOutX = botOutList[i - 1].X + cfg.OuterStepWidth;
-                    curTopOutY = botOutList[i - 1].Y + (curTopOutX - botOutList[i - 1].X) * k;
+                    curTopOutX = botOutX[i - 1] + cfg.OuterStepWidth;
+                    curTopOutY = botOutY[i - 1] + (curTopOutX - botOutX[i - 1]) * k;
 
-                    curTopInX = botInList[i - 1].X + cfg.InnerStepWidth;
-                    curTopInY = botInList[i - 1].Y + (curTopInX - botInList[i - 1].X) * k;
+                    curTopInX = botInX[i - 1] + cfg.InnerStepWidth;
+                    curTopInY = botInY[i - 1] + (curTopInX - botInX[i - 1]) * k;
                 }
 
-                topOutList[i] = new LeftPoint2D(curTopOutX, curTopOutY);
-                topInList[i] = new LeftPoint2D(curTopInX, curTopInY);
+                topOutX[i] = curTopOutX; topOutY[i] = curTopOutY;
+                topInX[i] = curTopInX; topInY[i] = curTopInY;
 
                 double outN = Math.Abs(cfg.OuterSlope);
                 double dx = -(outN * cfg.Thickness) / (1.0 - outN * k);
-                double botOutX = curTopOutX + dx;
-                double botOutY = curTopOutY - cfg.Thickness + dx * k;
-                botOutList[i] = new LeftPoint2D(botOutX, botOutY);
+                double botOutXv = curTopOutX + dx;
+                double botOutYv = curTopOutY - cfg.Thickness + dx * k;
+                botOutX[i] = botOutXv; botOutY[i] = botOutYv;
 
-                botInList[i] = new LeftPoint2D(curTopInX, curTopInY - cfg.Thickness);
+                botInX[i] = curTopInX; botInY[i] = curTopInY - cfg.Thickness;
 
-                polygons.Add(new LeftPoint2D[] {
-                    new LeftPoint2D(topOutList[i].X, topOutList[i].Y),
-                    new LeftPoint2D(botOutList[i].X, botOutList[i].Y),
-                    new LeftPoint2D(botInList[i].X, botInList[i].Y),
-                    new LeftPoint2D(topInList[i].X, topInList[i].Y)
-                });
+                var poly = new double[4, 2];
+                poly[0, 0] = topOutX[i]; poly[0, 1] = topOutY[i];
+                poly[1, 0] = botOutX[i]; poly[1, 1] = botOutY[i];
+                poly[2, 0] = botInX[i];  poly[2, 1] = botInY[i];
+                poly[3, 0] = topInX[i];  poly[3, 1] = topInY[i];
+                polygons.Add(poly);
             }
 
-            var innerList = new List<LeftPoint2D>();
-            var outerList = new List<LeftPoint2D>();
+            // 外 + 内 拼接
+            var combined = new List<double[]>();
 
             for (int i = 0; i < layerCount; i++)
             {
-                outerList.Add(topOutList[i]);
-                outerList.Add(botOutList[i]);
+                combined.Add(new double[] { topOutX[i], topOutY[i] });
+                combined.Add(new double[] { botOutX[i], botOutY[i] });
             }
+
+            var innerList = new List<double[]>();
+            innerList.Add(new double[] { topInX[0], centerPoint[1] });
             for (int i = 0; i < layerCount; i++)
             {
-                innerList.Add(topInList[i]);
-                innerList.Add(botInList[i]);
+                innerList.Add(new double[] { topInX[i], topInY[i] });
+                innerList.Add(new double[] { botInX[i], botInY[i] });
             }
-            innerList.Insert(0, new LeftPoint2D(topInList[0].X, centerPoint.Y));
             innerList.Reverse();
-
-            var combined = new List<LeftPoint2D>();
-            combined.AddRange(outerList);
             combined.AddRange(innerList);
 
-            subgradeLine = combined.ToArray();
+            subgradeLine = new double[combined.Count, 2];
+            for (int i = 0; i < combined.Count; i++)
+            {
+                subgradeLine[i, 0] = combined[i][0];
+                subgradeLine[i, 1] = combined[i][1];
+            }
+
             return polygons;
         }
     }
 
     // ============================================================
-    // 5. 右结构层解析（原 RightJiegoucengManager）
+    // 5. 右结构层解析（RightJiegoucengManager）
     // ============================================================
     public static class RightJiegoucengManager
     {
@@ -492,12 +564,12 @@ namespace hdm.Core
             return list;
         }
 
-        public static List<RightPoint2D[]> ComputeCoordinates(
-            double station, RightPoint2D centerPoint, double crossfall,
+        public static List<double[,]> ComputeCoordinates(
+            double station, double[] centerPoint, double crossfall,
             List<RightJiegoucengConfig> configs,
-            out RightPoint2D[] subgradeLine)
+            out double[,] subgradeLine)
         {
-            var polygons = new List<RightPoint2D[]>();
+            var polygons = new List<double[,]>();
 
             var activeLayers = configs
                 .Where(cfg => station >= cfg.StartStation && station <= cfg.EndStation)
@@ -506,21 +578,21 @@ namespace hdm.Core
 
             if (activeLayers.Count == 0)
             {
-                subgradeLine = Array.Empty<RightPoint2D>();
+                subgradeLine = new double[0, 2];
                 return polygons;
             }
 
             int layerCount = activeLayers.Count;
             double k = crossfall / 100.0;
 
-            var topOutList = new RightPoint2D[layerCount];
-            var botOutList = new RightPoint2D[layerCount];
-            var topInList = new RightPoint2D[layerCount];
-            var botInList = new RightPoint2D[layerCount];
+            double[] topOutX = new double[layerCount], topOutY = new double[layerCount];
+            double[] botOutX = new double[layerCount], botOutY = new double[layerCount];
+            double[] topInX = new double[layerCount], topInY = new double[layerCount];
+            double[] botInX = new double[layerCount], botInY = new double[layerCount];
 
             var firstLayer = activeLayers[0];
-            double curTopInX = centerPoint.X + firstLayer.InnerStepWidth;
-            double curTopInY = centerPoint.Y;
+            double curTopInX = centerPoint[0] + firstLayer.InnerStepWidth;
+            double curTopInY = centerPoint[1];
 
             double curTopOutX = curTopInX + firstLayer.OuterStepWidth;
             double curTopOutY = curTopInY + (curTopOutX - curTopInX) * k;
@@ -531,63 +603,66 @@ namespace hdm.Core
 
                 if (i > 0)
                 {
-                    curTopOutX = botOutList[i - 1].X + cfg.OuterStepWidth;
-                    curTopOutY = botOutList[i - 1].Y + (curTopOutX - botOutList[i - 1].X) * k;
+                    curTopOutX = botOutX[i - 1] + cfg.OuterStepWidth;
+                    curTopOutY = botOutY[i - 1] + (curTopOutX - botOutX[i - 1]) * k;
 
-                    curTopInX = botInList[i - 1].X + cfg.InnerStepWidth;
-                    curTopInY = botInList[i - 1].Y + (curTopInX - botInList[i - 1].X) * k;
+                    curTopInX = botInX[i - 1] + cfg.InnerStepWidth;
+                    curTopInY = botInY[i - 1] + (curTopInX - botInX[i - 1]) * k;
                 }
 
-                topOutList[i] = new RightPoint2D(curTopOutX, curTopOutY);
-                topInList[i] = new RightPoint2D(curTopInX, curTopInY);
+                topOutX[i] = curTopOutX; topOutY[i] = curTopOutY;
+                topInX[i] = curTopInX; topInY[i] = curTopInY;
 
                 double outN = Math.Abs(cfg.OuterSlope);
                 double dx = (outN * cfg.Thickness) / (1.0 + outN * k);
-                double botOutX = curTopOutX + dx;
-                double botOutY = curTopOutY - cfg.Thickness + (botOutX - curTopOutX) * k;
-                botOutList[i] = new RightPoint2D(botOutX, botOutY);
+                double botOutXv = curTopOutX + dx;
+                double botOutYv = curTopOutY - cfg.Thickness + (botOutXv - curTopOutX) * k;
+                botOutX[i] = botOutXv; botOutY[i] = botOutYv;
 
-                botInList[i] = new RightPoint2D(curTopInX, curTopInY - cfg.Thickness);
+                botInX[i] = curTopInX; botInY[i] = curTopInY - cfg.Thickness;
 
-                polygons.Add(new RightPoint2D[] {
-                    new RightPoint2D(topOutList[i].X, topOutList[i].Y),
-                    new RightPoint2D(botOutList[i].X, botOutList[i].Y),
-                    new RightPoint2D(botInList[i].X, botInList[i].Y),
-                    new RightPoint2D(topInList[i].X, topInList[i].Y)
-                });
+                var poly = new double[4, 2];
+                poly[0, 0] = topOutX[i]; poly[0, 1] = topOutY[i];
+                poly[1, 0] = botOutX[i]; poly[1, 1] = botOutY[i];
+                poly[2, 0] = botInX[i];  poly[2, 1] = botInY[i];
+                poly[3, 0] = topInX[i];  poly[3, 1] = topInY[i];
+                polygons.Add(poly);
             }
 
-            var innerList = new List<RightPoint2D>();
-            var outerList = new List<RightPoint2D>();
+            var combined = new List<double[]>();
 
-            innerList.Add(new RightPoint2D(topInList[0].X, centerPoint.Y));
+            combined.Add(new double[] { topInX[0], centerPoint[1] });
             for (int i = 0; i < layerCount; i++)
             {
-                innerList.Add(topInList[i]);
-                innerList.Add(botInList[i]);
+                combined.Add(new double[] { topInX[i], topInY[i] });
+                combined.Add(new double[] { botInX[i], botInY[i] });
             }
+
+            var outerList = new List<double[]>();
             for (int i = 0; i < layerCount; i++)
             {
-                outerList.Add(topOutList[i]);
-                outerList.Add(botOutList[i]);
+                outerList.Add(new double[] { topOutX[i], topOutY[i] });
+                outerList.Add(new double[] { botOutX[i], botOutY[i] });
             }
             outerList.Reverse();
-
-            var combined = new List<RightPoint2D>();
-            combined.AddRange(innerList);
             combined.AddRange(outerList);
 
-            subgradeLine = combined.ToArray();
+            subgradeLine = new double[combined.Count, 2];
+            for (int i = 0; i < combined.Count; i++)
+            {
+                subgradeLine[i, 0] = combined[i][0];
+                subgradeLine[i, 1] = combined[i][1];
+            }
+
             return polygons;
         }
     }
 
     // ============================================================
-    // 6. 通用文本读取（原 LL.ReadDataFromFile）
+    // 6. 通用文本读取（DataReader）
     // ============================================================
     public static class DataReader
     {
-        /// <summary>从文件读二维数值表（支持空格/逗号/制表符/中文逗号）</summary>
         public static double[,] ReadDataFromFile(
             string filePath, int columnCount,
             Encoding encoding = null, bool skipFirstRow = false)

@@ -13,80 +13,56 @@ namespace hdm.Core
         public List<double[]> BanKuaiJiHe { get; set; } = new List<double[]>();
     }
 
-    /// <summary>绝对板块点：中桩为 0，左负右正</summary>
-    public class JueDuiBanKuaiDian
-    {
-        public double WidthX { get; set; }
-        public double GaoChengY { get; set; }
-
-        public JueDuiBanKuaiDian(double x, double y) { WidthX = x; GaoChengY = y; }
-    }
-
-    /// <summary>路基车道结果包：左右两侧拐点</summary>
+    /// <summary>路基车道结果包（左右两侧板块 + 点）</summary>
     public class LuJiCheDaoJieGuoBao
     {
-        public List<JueDuiBanKuaiDian> ZuoCeCheDaoJueDui { get; set; } = new List<JueDuiBanKuaiDian>();
-        public List<JueDuiBanKuaiDian> YouCeCheDaoJueDui { get; set; } = new List<JueDuiBanKuaiDian>();
+        /// <summary>左侧点（从左到右）N×2：[x, y]</summary>
+        public double[,] ZuoCeCheDaoJueDui { get; set; }
+
+        /// <summary>右侧点（从左到右）N×2：[x, y]</summary>
+        public double[,] YouCeCheDaoJueDui { get; set; }
+
+        /// <summary>左侧板块（与左侧点一一对应）N×2：[宽度, 横坡%]</summary>
+        public double[,] ZuoBanKuai { get; set; }
+
+        /// <summary>右侧板块（与右侧点一一对应）N×2：[宽度, 横坡%]</summary>
+        public double[,] YouBanKuai { get; set; }
     }
 
     // ============================================================
     // 2. 边坡相关
     // ============================================================
 
-    /// <summary>边坡段落：起始/结束桩号 + 4 组相对位移</summary>
+    /// <summary>边坡段落：起始/结束桩号 + 4 组相对位移（每行 [dX, dY]）</summary>
     public class BianPoDuanLuo
     {
         public double QiShiZhuangHao { get; set; }
         public double JieShuZhuangHao { get; set; }
-        public List<double[]> ZuoTian { get; set; }
-        public List<double[]> ZuoWa { get; set; }
-        public List<double[]> YouTian { get; set; }
-        public List<double[]> YouWa { get; set; }
+        public double[,] ZuoTian { get; set; }
+        public double[,] ZuoWa { get; set; }
+        public double[,] YouTian { get; set; }
+        public double[,] YouWa { get; set; }
     }
 
-    /// <summary>边坡候选包：4 个绝对坐标序列</summary>
+    /// <summary>边坡候选包：4 个绝对坐标序列（每行 [x, y]）</summary>
     public class BianPoHouXuanBao
     {
-        public List<double[]> ZuoTianJueDui { get; set; } = new List<double[]>();
-        public List<double[]> ZuoWaJueDui { get; set; } = new List<double[]>();
-        public List<double[]> YouTianJueDui { get; set; } = new List<double[]>();
-        public List<double[]> YouWaJueDui { get; set; } = new List<double[]>();
+        public double[,] ZuoTianJueDui { get; set; }
+        public double[,] ZuoWaJueDui { get; set; }
+        public double[,] YouTianJueDui { get; set; }
+        public double[,] YouWaJueDui { get; set; }
     }
 
     // ============================================================
-    // 3. 横坡
+    // 3. 结构层配置
     // ============================================================
-
-    public struct CrossfallRecord
-    {
-        public double Station;
-        public double Slope;   // 绝对横坡(%)，例如 -2.5 表示 -2.5%
-    }
-
-    // ============================================================
-    // 4. 结构层
-    // ============================================================
-
-    public class LeftPoint2D
-    {
-        public double X { get; set; }
-        public double Y { get; set; }
-        public LeftPoint2D(double x, double y) { X = x; Y = y; }
-    }
-
-    public class RightPoint2D
-    {
-        public double X { get; set; }
-        public double Y { get; set; }
-        public RightPoint2D(double x, double y) { X = x; Y = y; }
-    }
 
     public class LeftJiegoucengConfig
     {
         public double StartStation { get; set; }
         public double EndStation { get; set; }
         public int LayerIndex { get; set; }
-        public string LayerName { get; set; }="";
+        public string LayerName { get; set; } = "";
         public double Thickness { get; set; }
         public double InnerStepWidth { get; set; }
         public double InnerSlope { get; set; }
@@ -99,7 +75,7 @@ namespace hdm.Core
         public double StartStation { get; set; }
         public double EndStation { get; set; }
         public int LayerIndex { get; set; }
-        public string LayerName { get; set; }="";
+        public string LayerName { get; set; } = "";
         public double Thickness { get; set; }
         public double InnerStepWidth { get; set; }
         public double InnerSlope { get; set; }
@@ -108,39 +84,54 @@ namespace hdm.Core
     }
 
     // ============================================================
-    // 5. 计算结果
+    // 4. 计算结果
     // ============================================================
 
     /// <summary>单桩号计算结果（保留全部几何数据，便于后续导出 CAD）</summary>
-    /// <summary>单桩号计算结果（保留全部几何数据，便于后续导出 CAD）</summary>
-public class SectionResult
-{
-    public double Station;
-    public double CenterY;
-    public double LOuterX, LOuterY;
-    public double ROuterX, ROuterY;
-    public double LeftCrossfall, RightCrossfall;
-    public double[,] FinalDesign = null!;
-    public double[,] FinalFinished = null!;
-    public double[,] Ground = null!;
-    public double[,] Cleared = null!;
-    public double[,] LeftSubgrade = null!;
-    public double[,] RightSubgrade = null!;
-    public List<double[,]> LayerPolygons = null!;
-    public List<string> LayerAreaTexts = null!;
-    public double FillArea, CutArea, ClearArea;
-    public double MinX, MaxX, MinY;
-    public List<double[]> LeftSlopePoints = null!;
-    public List<double[]> RightSlopePoints = null!;
-    public double LeftToeX, LeftToeY, RightToeX, RightToeY;
-}
+    public class SectionResult
+    {
+        // ---- 位置 ----
+        public double Station;       // 桩号
+        public double CenterY;       // 中桩设计高程
+
+        // ---- 关键点（单个点用 double[]）----
+        public double[] LOuter;      // 左路基外缘 [x, y]
+        public double[] ROuter;      // 右路基外缘 [x, y]
+        public double[] LToe;        // 左坡脚 [x, y]
+        public double[] RToe;        // 右坡脚 [x, y]
+
+        // ---- 折线 ----
+        public double[,] Ground;         // 地面线
+        public double[,] Cleared;        // 清表线
+        public double[,] Design;         // 设计线（裁剪后）
+        public double[,] Finished;       // 完工线
+        public double[,] LeftSubgrade;   // 左路基线
+        public double[,] RightSubgrade;  // 右路基线
+        public List<double[,]> Layers;   // 结构层多边形
+
+        // ---- 顶面板块（与车道点一一对应）----
+        public double[,] LeftSlabs;      // N×2：[宽度, 横坡%]
+        public double[,] RightSlabs;
+
+        // ---- 边坡 ----
+        public double[,] LeftSlopeRaw;       // 左边坡（裁剪前，完整）
+        public double[,] LeftSlopeTrimmed;   // 左边坡（裁剪后）
+        public double[,] RightSlopeRaw;      // 右边坡（裁剪前，完整）
+        public double[,] RightSlopeTrimmed;  // 右边坡（裁剪后）
+
+        // ---- 面积 ----
+        public double FillArea, CutArea, ClearArea;
+        public List<string> LayerAreas;      // 结构层面积文本
+
+        // ---- 包围盒 ----
+        public double[] Bounds;              // [MinX, MinY, MaxX, MaxY]
+    }
 
     /// <summary>计算结果的包装（成功/失败/错误信息）</summary>
-    /// <summary>计算结果的包装（成功/失败/错误信息）</summary>
-public class ComputeResult
-{
-    public bool Success { get; set; }
-    public SectionResult Result { get; set; } = null!;
-    public string ErrorMessage { get; set; } = null!;
-}
+    public class ComputeResult
+    {
+        public bool Success { get; set; }
+        public SectionResult Result { get; set; } = null!;
+        public string ErrorMessage { get; set; } = null!;
+    }
 }

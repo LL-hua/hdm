@@ -5,7 +5,7 @@ using System.IO;
 namespace hdm.Core
 {
     /// <summary>
-    /// 项目配置（每个项目一份实例，避免静态状态串味）
+    /// 项目配置（每个项目一份实例）
     /// 只保留纯计算需要的 3 个参数。
     /// </summary>
     public class AppConfig

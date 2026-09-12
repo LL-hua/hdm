@@ -109,7 +109,7 @@ class Program
 
             Console.WriteLine();
             Console.WriteLine("=========================");
-            Console.WriteLine($" 桩号: {LL.hua_Num2K(station)}");
+            Console.WriteLine($" 桩号: {LL.hua_Num2K(station)}  ({station} m)");
             if (!r.Success)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
@@ -122,10 +122,10 @@ class Program
                 Console.WriteLine($" 填方面积: {s.FillArea:F3} ㎡");
                 Console.WriteLine($" 挖方面积: {s.CutArea:F3} ㎡");
                 Console.WriteLine($" 清表面积: {s.ClearArea:F3} ㎡");
-                Console.WriteLine($" 清表范围: X = [{s.MinX:F3}, {s.MaxX:F3}]");
+                Console.WriteLine($" 清表范围: X = [{s.Bounds[0]:F3}, {s.Bounds[2]:F3}]");
                 Console.WriteLine($" 中桩高程: {s.CenterY:F3}");
                 Console.WriteLine(" 结构层面积:");
-                foreach (var txt in s.LayerAreaTexts)
+                foreach (var txt in s.LayerAreas)
                     Console.WriteLine($"   {txt}");
             }
             Console.WriteLine($" 耗时: {t.Elapsed.TotalMilliseconds:F2} ms");
